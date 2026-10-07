@@ -1,5 +1,5 @@
 export type Job={id:string;title:string;company:string;category:string;location:string;type:string;experience:string;compensation:string;description:string;skills:string[];responsibilities:string[];isSample:boolean;status:string;createdAt:string};
-export const partners=['Terek','Micro One','Marker','Turing','SME Careers'];
+export const partners=['Terrac','Micro1','Mercor','Turing','SME Careers'];
 export const categories=['All roles','AI & ML','Engineering','Data & Evaluation','Domain Experts'];
 export const sampleJobs:Job[]=[
 {id:'example-evaluator',title:'AI Model Evaluator',category:'Data & Evaluation',skills:['English','Analytical thinking','Quality review'],description:'Help shape better AI by assessing responses for clarity, accuracy, and usefulness.',responsibilities:['Compare AI responses against clear quality criteria.','Identify factual errors and explain your reasoning.','Provide structured feedback for improvement.']},
