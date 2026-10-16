@@ -14,5 +14,5 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ r
     redirect(`/auth?return_to=${encodeURIComponent(returnTo)}`);
   }
 
-  return <Dashboard userName={user.name} email={user.email} role={role} />;
+  return <Dashboard userName={user.name} email={user.email} role={role} userRole={user.role} />;
 }
