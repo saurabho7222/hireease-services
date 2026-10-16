@@ -9,18 +9,27 @@ export async function GET(r: Request) {
   const state = crypto.randomUUID();
   const stateCookie = `hireease_oauth_state=${state}; Path=/; HttpOnly; SameSite=Lax; Max-Age=600`;
 
-  const { clientId } = getGoogleConfig();
+  const { clientId, isConfigured } = getGoogleConfig();
+  let redirectDestination: string;
 
-  // Directly redirect to Google OAuth authorization screen
-  const googleAuthUrl = new URL('https://accounts.google.com/o/oauth2/v2/auth');
-  googleAuthUrl.searchParams.set('client_id', clientId);
-  googleAuthUrl.searchParams.set('redirect_uri', callbackUrl);
-  googleAuthUrl.searchParams.set('response_type', 'code');
-  googleAuthUrl.searchParams.set('scope', 'openid email profile');
-  googleAuthUrl.searchParams.set('state', state);
-  googleAuthUrl.searchParams.set('prompt', 'select_account');
-  googleAuthUrl.searchParams.set('access_type', 'online');
-  const redirectDestination = googleAuthUrl.toString();
+  if (isConfigured && clientId) {
+    // Production Google OAuth authorization screen
+    const googleAuthUrl = new URL('https://accounts.google.com/o/oauth2/v2/auth');
+    googleAuthUrl.searchParams.set('client_id', clientId);
+    googleAuthUrl.searchParams.set('redirect_uri', callbackUrl);
+    googleAuthUrl.searchParams.set('response_type', 'code');
+    googleAuthUrl.searchParams.set('scope', 'openid email profile');
+    googleAuthUrl.searchParams.set('state', state);
+    googleAuthUrl.searchParams.set('prompt', 'select_account');
+    googleAuthUrl.searchParams.set('access_type', 'online');
+    redirectDestination = googleAuthUrl.toString();
+  } else {
+    // Graceful fallback to consent / account chooser
+    const consentUrl = new URL(`${origin}/auth/google-consent`);
+    consentUrl.searchParams.set('state', state);
+    consentUrl.searchParams.set('redirect_uri', callbackUrl);
+    redirectDestination = consentUrl.toString();
+  }
 
   return new Response(null, {
     status: 302,

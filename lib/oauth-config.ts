@@ -35,6 +35,32 @@ function getEnvFilePath(): string {
   return path.resolve(process.cwd(), '.env');
 }
 
+function findClientSecretJson(): { clientId?: string; clientSecret?: string } {
+  try {
+    const cwd = process.cwd();
+    const candidateDirs = [cwd, path.resolve(cwd, 'hireease-site'), path.resolve(cwd, '..')];
+    for (const dir of candidateDirs) {
+      if (!fs.existsSync(dir)) continue;
+      const files = fs.readdirSync(dir);
+      const secretFile = files.find(f => f.startsWith('client_secret') && f.endsWith('.json'));
+      if (secretFile) {
+        const fullPath = path.join(dir, secretFile);
+        const data = JSON.parse(fs.readFileSync(fullPath, 'utf-8'));
+        const config = data.web || data.installed;
+        if (config?.client_id) {
+          return {
+            clientId: config.client_id,
+            clientSecret: config.client_secret || ''
+          };
+        }
+      }
+    }
+  } catch (err) {
+    console.warn('Could not read client_secret JSON:', err);
+  }
+  return {};
+}
+
 export function getGoogleConfig(): GoogleOAuthConfig {
   let clientId = (typeof process !== 'undefined' ? process.env?.GOOGLE_CLIENT_ID || process.env?.NEXT_PUBLIC_GOOGLE_CLIENT_ID : '') || '';
   let clientSecret = (typeof process !== 'undefined' ? process.env?.GOOGLE_CLIENT_SECRET : '') || '';
@@ -47,6 +73,17 @@ export function getGoogleConfig(): GoogleOAuthConfig {
     }
     if (!clientSecret && fileEnv['GOOGLE_CLIENT_SECRET']) {
       clientSecret = fileEnv['GOOGLE_CLIENT_SECRET'];
+    }
+  }
+
+  // If still not found, check for client_secret*.json file
+  if (!clientId || !clientSecret) {
+    const jsonSecret = findClientSecretJson();
+    if (!clientId && jsonSecret.clientId) {
+      clientId = jsonSecret.clientId;
+    }
+    if (!clientSecret && jsonSecret.clientSecret) {
+      clientSecret = jsonSecret.clientSecret;
     }
   }
 
