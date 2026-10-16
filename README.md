@@ -1,6 +1,16 @@
-# vinext-starter
+# HireEase Services
 
-A clean full-stack starter running on [vinext](https://github.com/cloudflare/vinext), with optional Cloudflare D1 and Drizzle support.
+AI-powered modern recruitment and talent acquisition platform. Bridging human talent with intelligent opportunities.
+
+## ✨ Features
+- 🚀 Modern Next.js full-stack platform with Drizzle ORM and Cloudflare Worker support
+- 🔐 Complete Authentication System:
+  - Direct 1-Click Google Sign-in + Google Identity Services (GSI) One-Tap login
+  - Direct 1-Click GitHub Developer Sign-in + standard GitHub OAuth 2.0
+  - LinkedIn OAuth 2.0 integration
+- 📋 Candidate talent profiles, résumé management, and instant skill matching
+- 💼 Application submission & real-time tracking
+
 
 ## Prerequisites
 
@@ -124,3 +134,9 @@ The portable build runs Vinext directly without a host `timeout` command. The ma
 
 - [vinext Documentation](https://github.com/cloudflare/vinext)
 - [Drizzle D1 Guide](https://orm.drizzle.team/docs/get-started/d1-new)
+
+## 👥 Contributors
+
+- **Saurabh Kumar Ojha** - [@saurabho7222](https://github.com/saurabho7222)
+- **Vasu Dubey** - [@dubeyvasu](https://github.com/dubeyvasu)
+
