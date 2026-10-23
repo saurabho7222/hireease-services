@@ -2,8 +2,18 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "HireEase Services | Your next chapter in AI",
-  description: "Explore AI roles, build your talent profile, and connect with recruiting partners through HireEase Services.",
+  title: "AI Training Jobs from Top AI Platforms in One Feed | HireEase Talent Network",
+  description: "Stop refreshing a dozen job boards. HireEase Talent Network pulls remote AI training jobs from top AI platforms into one feed and matches them to your skills. 100% free to join.",
+  keywords: [
+    "AI training jobs",
+    "data annotation",
+    "RLHF training",
+    "LLM evaluation",
+    "subject matter expert",
+    "clinical review",
+    "legal AI review",
+    "remote AI jobs"
+  ],
   other: {
     "codex-preview": "development",
   },

@@ -3,8 +3,23 @@ import { sendCandidateApprovalEmail } from '@/lib/email-service';
 import { z } from 'zod';
 
 const updateApplicationSchema = z.object({
-  id: z.string().uuid(),
-  status: z.enum(['submitted', 'review', 'interview', 'selected', 'not_selected']),
+  id: z.string().min(1).max(100),
+  status: z.enum([
+    'pending',
+    'submitted',
+    'review',
+    'under_review',
+    'interview_scheduled',
+    'interview',
+    'interview_done',
+    'approved',
+    'selected',
+    'hired',
+    'rejected',
+    'not_selected'
+  ]),
+  notes: z.string().max(4000).optional(),
+  rating: z.number().min(0).max(5).optional(),
   sendEmail: z.boolean().optional()
 });
 
@@ -33,12 +48,31 @@ export async function PATCH(r: Request) {
       throw new ApiError('Application not found.', 404);
     }
 
-    // Update status in SQLite
+    // Merge notes & rating into snapshot JSON safely
+    let snap: Record<string, any> = {};
+    try {
+      snap = JSON.parse(existing.snapshot || '{}');
+    } catch {
+      snap = {};
+    }
+
+    if (data.notes !== undefined) {
+      snap.adminNotes = data.notes;
+      snap.adminNotesUpdatedAt = now;
+      snap.adminNotesUpdatedBy = u.userId;
+    }
+    if (data.rating !== undefined) {
+      snap.adminRating = data.rating;
+    }
+
+    const updatedSnapshot = JSON.stringify(snap);
+
+    // Update status and snapshot in database
     const result = await d.prepare(`
       UPDATE applications
-      SET status = ?, updated_at = ?, updated_by = ?
+      SET status = ?, snapshot = ?, updated_at = ?, updated_by = ?
       WHERE id = ?
-    `).bind(data.status, now, u.userId, data.id).run();
+    `).bind(data.status, updatedSnapshot, now, u.userId, data.id).run();
 
     if (!result.meta.changes) {
       throw new ApiError('Could not update application.', 500);
@@ -47,12 +81,12 @@ export async function PATCH(r: Request) {
     let emailSent = false;
     let recipientEmail = '';
 
-    // If status is updated to 'selected' (approved) or sendEmail is requested, dispatch approval email
-    if (data.status === 'selected' || data.sendEmail) {
+    // If status is updated to 'selected' / 'approved' or sendEmail is requested, dispatch approval email
+    const isApprovalStatus = data.status === 'selected' || data.status === 'approved';
+    if (isApprovalStatus || data.sendEmail) {
       try {
-        const candidateProfile = JSON.parse(existing.snapshot || '{}');
-        recipientEmail = candidateProfile.email;
-        const recipientName = candidateProfile.name || 'Candidate';
+        recipientEmail = snap.email;
+        const recipientName = snap.name || 'Candidate';
 
         if (recipientEmail) {
           await sendCandidateApprovalEmail({
@@ -72,6 +106,8 @@ export async function PATCH(r: Request) {
     return json({
       updated: true,
       status: data.status,
+      notes: snap.adminNotes || '',
+      rating: snap.adminRating || 0,
       emailSent,
       recipientEmail
     });
@@ -79,3 +115,4 @@ export async function PATCH(r: Request) {
     return fail(e);
   }
 }
+
