@@ -303,42 +303,30 @@ export default function Home() {
       case 'Outlier':
         return (
           <div className="partner-logo-box outlier">
-            <svg width="22" height="22" viewBox="0 0 100 100" fill="none" className="shrink-0">
-              <circle cx="50" cy="50" r="42" stroke="#18201b" strokeWidth="8" />
-              <circle cx="50" cy="50" r="22" stroke="#18201b" strokeWidth="7" />
-              <circle cx="50" cy="18" r="8" fill="#10b981" />
-            </svg>
-            <span className="partner-logo-text outlier-text">Outlier</span>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/logos/outlier.svg" alt="Outlier" className="platform-svg-img" style={{ height: '22px', width: 'auto', objectFit: 'contain' }} />
           </div>
         );
       case 'DataAnnotation.tech':
         return (
           <div className="partner-logo-box data-annotation">
-            <svg width="22" height="22" viewBox="0 0 100 100" fill="none" className="shrink-0">
-              <path d="M36 20 C22 20 20 34 20 48 C20 62 22 80 36 80" stroke="#18201b" strokeWidth="8" strokeLinecap="round" fill="none" />
-              <path d="M64 20 C78 20 80 34 80 48 C80 62 78 80 64 80" stroke="#18201b" strokeWidth="8" strokeLinecap="round" fill="none" />
-              <circle cx="50" cy="50" r="9" fill="#10b981" />
-            </svg>
-            <span className="partner-logo-text dataannotation-text">DataAnnotation</span>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/logos/dataannotation.svg" alt="DataAnnotation" className="platform-svg-img" style={{ height: '24px', width: 'auto', objectFit: 'contain' }} />
           </div>
         );
       case 'Mindrift':
         return (
           <div className="partner-logo-box mindrift">
-            <svg width="24" height="24" viewBox="0 0 100 100" fill="none" className="shrink-0">
-              <path d="M26 50 C26 36 39 36 50 50 C61 64 74 64 74 50 C74 36 61 36 50 50 C39 64 26 64 26 50 Z" stroke="#6366f1" strokeWidth="9" strokeLinecap="round" fill="none" />
-            </svg>
-            <span className="partner-logo-text mindrift-text">Mindrift</span>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/logos/mindrift.svg" alt="Mindrift" className="platform-svg-img" style={{ height: '22px', width: 'auto', objectFit: 'contain' }} />
           </div>
         );
       case 'Harvey AI':
         return (
           <div className="partner-logo-box harvey-ai">
-            <svg width="22" height="22" viewBox="0 0 100 100" fill="none" className="shrink-0">
-              <rect width="100" height="100" rx="22" fill="#18201b" />
-              <path d="M50 20 V80 M28 35 H72 M28 35 L20 54 H36 Z M72 35 L64 54 H80 Z" stroke="#ffffff" strokeWidth="6" strokeLinecap="round" strokeLinejoin="round" fill="none" />
-            </svg>
-            <span className="partner-logo-text harvey-text">Harvey <span style={{ color: '#507039' }}>AI</span></span>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/logos/harvey.svg" alt="Harvey AI" className="platform-svg-icon" style={{ height: '20px', width: 'auto', objectFit: 'contain' }} />
+            <span className="partner-logo-text harvey-text" style={{ fontSize: '16px', fontWeight: 700 }}>Harvey AI</span>
           </div>
         );
       default:
