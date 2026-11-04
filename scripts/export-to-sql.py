@@ -192,7 +192,8 @@ CREATE TABLE jobs (
     responsibilities TEXT NOT NULL DEFAULT '[]',
     status VARCHAR(32) NOT NULL DEFAULT 'open',
     created_at VARCHAR(64) NOT NULL,
-    updated_at VARCHAR(64) NOT NULL
+    updated_at VARCHAR(64) NOT NULL,
+    external_url TEXT
 );
 CREATE INDEX idx_jobs_status_created ON jobs (status, created_at);
 
@@ -378,6 +379,7 @@ CREATE TABLE `jobs` (
   `status` VARCHAR(32) NOT NULL DEFAULT 'open',
   `created_at` VARCHAR(64) NOT NULL,
   `updated_at` VARCHAR(64) NOT NULL,
+  `external_url` TEXT DEFAULT NULL,
   PRIMARY KEY (`id`),
   KEY `idx_jobs_status_created` (`status`, `created_at`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

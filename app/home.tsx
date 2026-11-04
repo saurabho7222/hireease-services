@@ -30,7 +30,8 @@ import {
   Laptop,
   Globe,
   Pause,
-  Play
+  Play,
+  FileSpreadsheet
 } from 'lucide-react';
 import { Sheet, SheetContent, SheetTitle, SheetDescription } from '@/components/ui/sheet';
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from '@/components/ui/dialog';
@@ -57,6 +58,19 @@ export function WhatsAppIcon({ size = 16, className = '' }: { size?: number; cla
       <path d="M12.04 2c-5.46 0-9.91 4.45-9.91 9.91 0 1.75.46 3.45 1.32 4.95L2.05 22l5.25-1.38c1.45.79 3.08 1.21 4.74 1.21 5.46 0 9.91-4.45 9.91-9.91 0-2.65-1.03-5.14-2.9-7.01A9.816 9.816 0 0 0 12.04 2m.01 1.67c2.2 0 4.26.86 5.82 2.42a8.225 8.225 0 0 1 2.41 5.83c0 4.54-3.7 8.24-8.24 8.24-1.48 0-2.93-.4-4.2-1.15l-.3-.18-3.12.82.83-3.04-.2-.31a8.196 8.196 0 0 1-1.26-4.38c0-4.54 3.7-8.24 8.24-8.24m4.52 11.66c-.19-.09-1.11-.55-1.28-.61-.17-.07-.3-.09-.43.1-.12.19-.48.61-.59.73-.11.12-.22.14-.4.05-.19-.09-.79-.29-1.5-.93-.55-.49-.93-1.1-1.04-1.28-.11-.19-.01-.29.08-.38.08-.08.19-.22.28-.33.09-.11.12-.19.19-.31.06-.12.03-.24-.02-.33-.04-.09-.43-1.03-.59-1.41-.15-.37-.31-.32-.43-.33h-.37c-.12 0-.33.05-.5.24-.18.19-.68.66-.68 1.62 0 .96.7 1.88.8 2.01.09.12 1.37 2.09 3.32 2.93.46.2.83.32 1.11.41.47.15.89.13 1.23.08.37-.06 1.11-.45 1.27-.89.15-.43.15-.81.11-.89-.04-.08-.17-.13-.36-.22z"/>
     </svg>
   );
+}
+
+export function getDomainIcon(iconName: string, size = 18, className = '') {
+  switch (iconName) {
+    case 'TrendingUp': return <TrendingUp size={size} className={className} />;
+    case 'Languages': return <Languages size={size} className={className} />;
+    case 'Code2': return <Code2 size={size} className={className} />;
+    case 'Atom': return <Atom size={size} className={className} />;
+    case 'Sparkles': return <Sparkles size={size} className={className} />;
+    case 'Stethoscope': return <Stethoscope size={size} className={className} />;
+    case 'Scale': return <Scale size={size} className={className} />;
+    default: return <Sparkles size={size} className={className} />;
+  }
 }
 
 export function Brand({ light = false }: { light?: boolean }) {
@@ -678,7 +692,15 @@ export default function Home() {
                 <h2>AI Training Roles in One Feed</h2>
                 <p>Explore remote annotation, RLHF, and subject matter expert openings.</p>
               </div>
-              <div className="flex items-center gap-3">
+              <div className="flex items-center gap-3 flex-wrap">
+                <a
+                  href="/micro1-referral-jobs.xlsx"
+                  download="micro1-referral-jobs.xlsx"
+                  className="btn outline-green text-xs font-semibold flex items-center gap-2"
+                  title="Download all 388+ extracted jobs as an Excel (.xlsx) file"
+                >
+                  <FileSpreadsheet size={15} /> Export Excel (.xlsx)
+                </a>
                 <button
                   onClick={() => setAlertModalOpen(true)}
                   className="btn outline-green text-xs font-semibold flex items-center gap-2"
@@ -856,7 +878,9 @@ export default function Home() {
                           <Bookmark size={15} />
                         </button>
                         <a
-                          href={`/dashboard?role=${encodeURIComponent(j.id)}`}
+                          href={j.externalUrl || `/dashboard?role=${encodeURIComponent(j.id)}`}
+                          target={j.externalUrl ? "_blank" : undefined}
+                          rel={j.externalUrl ? "noopener noreferrer" : undefined}
                           className="btn-apply-primary"
                         >
                           Apply now
@@ -914,7 +938,7 @@ export default function Home() {
           </div>
         </section>
 
-        {/* Interactive Talent Pool Stack (Image 2) */}
+        {/* Interactive Talent Pool Showcase (Re-designed Discipline Matrix) */}
         <section className="talent-stack-section" id="fields">
           <div className="section-header-compact text-center">
             <span className="platform-directory-eyebrow">
@@ -927,54 +951,166 @@ export default function Home() {
             </p>
           </div>
 
-          <div className="talent-stack-container">
+          {/* Domain Tabs Navigation */}
+          <div className="domain-tabs-nav">
             {expertiseProfiles.map(p => {
               const isActive = activeDomain === p.id;
-              if (isActive) {
-                return (
+              return (
+                <button
+                  key={p.id}
+                  onClick={() => setActiveDomain(p.id)}
+                  className={`domain-tab-btn ${isActive ? 'active' : ''}`}
+                >
+                  <span className="domain-tab-icon">
+                    {getDomainIcon(p.icon, 16)}
+                  </span>
+                  <span className="domain-tab-name">{p.name}</span>
+                  <span className="domain-tab-pay">{p.pay.split(' ')[0]}+</span>
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Active Domain Spotlight Bento Card */}
+          {(() => {
+            const current = expertiseProfiles.find(p => p.id === activeDomain) || expertiseProfiles[0];
+            return (
+              <div className="domain-spotlight-card">
+                <div className="domain-spotlight-content">
+                  <div className="domain-spotlight-header">
+                    <span className="domain-pill-badge">
+                      {getDomainIcon(current.icon, 14)}
+                      <span>SPECIALIST DISCIPLINE</span>
+                    </span>
+                    <span className="domain-demand-tag">● High Frontier Demand</span>
+                  </div>
+
+                  <h3 className="domain-spotlight-title">{current.name}</h3>
+                  <p className="domain-spotlight-roles">{current.roles}</p>
+                  <p className="domain-spotlight-desc">{current.description}</p>
+
+                  <div className="domain-metrics-row">
+                    <div className="domain-metric-box">
+                      <span className="domain-metric-label">Typical Rate</span>
+                      <strong className="domain-metric-val">{current.pay}</strong>
+                    </div>
+                    <div className="domain-metric-box">
+                      <span className="domain-metric-label">Work Style</span>
+                      <strong className="domain-metric-val">100% Remote / Async</strong>
+                    </div>
+                    <div className="domain-metric-box">
+                      <span className="domain-metric-label">Vetting Speed</span>
+                      <strong className="domain-metric-val">24-48 hr Screening</strong>
+                    </div>
+                  </div>
+
+                  <div className="domain-skills-section">
+                    <span className="domain-skills-label">VERIFIED CORE SKILLS</span>
+                    <div className="domain-skills-chips">
+                      {current.skills.map(s => (
+                        <span key={s} className="domain-skill-chip">{s}</span>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="domain-spotlight-actions">
+                    <button
+                      onClick={() => {
+                        setCategory(current.id === 'annotation' ? 'Data Annotation & RLHF' : current.name);
+                        document.getElementById('opportunities')?.scrollIntoView({ behavior: 'smooth' });
+                      }}
+                      className="btn-explore-domain-primary"
+                    >
+                      <span>Explore {current.name} Roles</span>
+                      <span className="btn-explore-arrow">
+                        <ArrowRight size={14} />
+                      </span>
+                    </button>
+                    <button
+                      onClick={() => {
+                        setTalentPoolDomain(current.name);
+                        setTalentPoolModalOpen(true);
+                      }}
+                      className="btn-domain-join-pool"
+                    >
+                      Join Priority Pool
+                    </button>
+                  </div>
+                </div>
+
+                <div className="domain-spotlight-visual">
                   <div
-                    key={p.id}
-                    className="talent-stack-card active"
-                    style={{ backgroundImage: `url(${p.bgImage})` }}
+                    className="domain-visual-img"
+                    style={{ backgroundImage: `url(${current.bgImage})` }}
                   >
-                    <div className="talent-stack-overlay">
-                      <div className="talent-stack-active-content">
-                        <h3 className="talent-stack-active-title">{p.name}</h3>
-                        <p className="talent-stack-active-sub">{p.roles}</p>
-                        <button
-                          onClick={() => {
-                            setCategory(p.id === 'annotation' ? 'Data Annotation & RLHF' : p.name);
-                            document.getElementById('opportunities')?.scrollIntoView({ behavior: 'smooth' });
-                          }}
-                          className="btn-explore-domain"
-                        >
-                          Explore roles
-                          <span className="btn-explore-domain-arrow">
-                            <ArrowRight size={13} />
-                          </span>
-                        </button>
+                    <div className="domain-visual-overlay">
+                      <div className="domain-visual-top">
+                        <span className="domain-live-tag">Active Dispatch</span>
+                        <span className="domain-score-tag">98.7% Client Acceptance</span>
+                      </div>
+                      <div className="domain-visual-card">
+                        <div className="domain-visual-card-icon">
+                          <CheckCircle2 size={18} className="text-emerald-400" />
+                        </div>
+                        <div>
+                          <strong>Human-in-the-Loop Validation</strong>
+                          <p>Auditing frontier reasoning, factual rigor, and safety benchmarks.</p>
+                        </div>
                       </div>
                     </div>
                   </div>
-                );
-              }
+                </div>
+              </div>
+            );
+          })()}
 
+          {/* All 7 Disciplines Overview Grid */}
+          <div className="domain-overview-header">
+            <h4>Browse all 7 disciplines</h4>
+            <p>Click any field to inspect requirements or filter open contracts</p>
+          </div>
+
+          <div className="domain-all-grid">
+            {expertiseProfiles.map(p => {
+              const isActive = activeDomain === p.id;
               return (
                 <div
                   key={p.id}
-                  className="talent-stack-card inactive"
-                  style={{ backgroundImage: `url(${p.bgImage})` }}
+                  className={`domain-mini-card ${isActive ? 'active' : ''}`}
                   onClick={() => setActiveDomain(p.id)}
                 >
-                  <div className="talent-stack-overlay">
-                    <span className="talent-stack-inactive-title">{p.name}</span>
+                  <div className="domain-mini-top">
+                    <div className="domain-mini-icon">
+                      {getDomainIcon(p.icon, 18)}
+                    </div>
+                    <span className="domain-mini-pay">{p.pay}</span>
+                  </div>
+                  <h4 className="domain-mini-title">{p.name}</h4>
+                  <p className="domain-mini-roles">{p.roles}</p>
+                  <div className="domain-mini-skills">
+                    {p.skills.slice(0, 3).map(s => (
+                      <span key={s}>{s}</span>
+                    ))}
+                    {p.skills.length > 3 && <span>+{p.skills.length - 3}</span>}
+                  </div>
+                  <div className="domain-mini-foot">
+                    <button
+                      onClick={e => {
+                        e.stopPropagation();
+                        setCategory(p.id === 'annotation' ? 'Data Annotation & RLHF' : p.name);
+                        document.getElementById('opportunities')?.scrollIntoView({ behavior: 'smooth' });
+                      }}
+                      className="domain-mini-action"
+                    >
+                      View Roles <ArrowRight size={13} />
+                    </button>
                   </div>
                 </div>
               );
             })}
           </div>
 
-          <div className="text-center">
+          <div className="text-center mt-8">
             <button
               onClick={() => setTalentPoolModalOpen(true)}
               className="btn-join-talent-pool-big"
@@ -991,53 +1127,91 @@ export default function Home() {
         <section className="community-section" id="community">
           <div className="wrap">
             <div className="section-header-compact text-center">
-              <span className="eyebrow uppercase tracking-widest text-emerald-800">
+              <span className="platform-directory-eyebrow">
                 OFFICIAL COMMUNITY
               </span>
-              <h2>Join 15,000+ AI Trainers & Specialists</h2>
-              <p>
+              <h2 className="platform-directory-title">Join 15,000+ AI Trainers & Specialists</h2>
+              <p className="platform-directory-subtext" style={{ margin: '0 auto' }}>
                 Get instant job drop notifications, real-time assessment leaks and guidelines, and direct peer networking.
               </p>
             </div>
 
             <div className="community-grid">
-              <div className="community-card">
-                <div>
-                  <span className="community-badge whatsapp">
-                    <WhatsAppIcon size={14} /> WhatsApp Community
+              <div className="community-card whatsapp-card">
+                <div className="community-card-top">
+                  <div className="community-icon-bubble whatsapp">
+                    <WhatsAppIcon size={24} />
+                  </div>
+                  <span className="community-status-pill whatsapp">
+                    <span className="status-dot"></span> 15,000+ Active Members
                   </span>
-                  <h3>📢 Join Our WhatsApp Community</h3>
+                </div>
+
+                <div className="community-card-body">
+                  <span className="community-tag whatsapp">INSTANT ALERTS & DISCUSSIONS</span>
+                  <h3>Join Our WhatsApp Community</h3>
                   <p>
                     Get instant alerts when high-paying AI annotation and RLHF roles drop, assessment interview prep, prompt tips, and direct contractor discussions.
                   </p>
+
+                  <div className="community-perks-row">
+                    <span>⚡ Live Role Drops</span>
+                    <span>🎯 Assessment Prep</span>
+                    <span>💬 Peer Networking</span>
+                    <span>💰 Pay Benchmarks</span>
+                  </div>
                 </div>
+
                 <a
                   href="https://chat.whatsapp.com/Jkb7Uip2sPYK6OLIrR8pFM"
                   target="_blank"
                   rel="noopener noreferrer"
                   className="btn-community-action whatsapp"
                 >
-                  <WhatsAppIcon size={18} /> Join WhatsApp Community
+                  <WhatsAppIcon size={18} />
+                  <span>Join WhatsApp Community</span>
+                  <span className="community-btn-arrow">
+                    <ArrowRight size={14} />
+                  </span>
                 </a>
               </div>
 
-              <div className="community-card">
-                <div>
-                  <span className="community-badge linkedin">
-                    <LinkedinIcon size={14} /> LinkedIn Company
+              <div className="community-card linkedin-card">
+                <div className="community-card-top">
+                  <div className="community-icon-bubble linkedin">
+                    <LinkedinIcon size={24} />
+                  </div>
+                  <span className="community-status-pill linkedin">
+                    <span className="status-dot linkedin"></span> Official Company Channel
                   </span>
-                  <h3>🔗 Follow Us on LinkedIn</h3>
+                </div>
+
+                <div className="community-card-body">
+                  <span className="community-tag linkedin">ENTERPRISE BENCHMARKS & UPDATES</span>
+                  <h3>Follow Us on LinkedIn</h3>
                   <p>
                     Stay updated on enterprise AI industry benchmarks, client project rollouts, remote work guidelines, and verified company announcements.
                   </p>
+
+                  <div className="community-perks-row">
+                    <span>🏛️ Client Rollouts</span>
+                    <span>📈 AI Industry Data</span>
+                    <span>🛡️ Verified Contracts</span>
+                    <span>🌐 Global Network</span>
+                  </div>
                 </div>
+
                 <a
                   href="https://www.linkedin.com/company/hireease-services/"
                   target="_blank"
                   rel="noopener noreferrer"
                   className="btn-community-action linkedin"
                 >
-                  <LinkedinIcon size={18} /> Follow on LinkedIn
+                  <LinkedinIcon size={18} />
+                  <span>Follow on LinkedIn</span>
+                  <span className="community-btn-arrow">
+                    <ArrowRight size={14} />
+                  </span>
                 </a>
               </div>
             </div>
@@ -1544,9 +1718,11 @@ export default function Home() {
                   <div className="sheet-action-row">
                     <a
                       className="btn green w-full font-bold py-3 text-center"
-                      href={`/dashboard?role=${encodeURIComponent(detail.id)}`}
+                      href={detail.externalUrl || `/dashboard?role=${encodeURIComponent(detail.id)}`}
+                      target={detail.externalUrl ? "_blank" : undefined}
+                      rel={detail.externalUrl ? "noopener noreferrer" : undefined}
                     >
-                      Apply with HireEase Profile
+                      {detail.externalUrl ? `Apply on ${detail.company || 'Micro1'} (Referral)` : 'Apply with HireEase Profile'}
                     </a>
                   </div>
                 </>

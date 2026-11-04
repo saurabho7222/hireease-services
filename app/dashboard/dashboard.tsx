@@ -1319,8 +1319,18 @@ ${resumeEducation}
                         Explore all public and vetted openings across 10+ AI specialist platforms and in-house project pipelines.
                       </p>
                     </div>
-                    <div className="text-xs font-bold bg-[#edf7e3] text-[#2e5c17] px-3 py-1.5 rounded-lg border border-[#d2ebd5]">
-                      Showing {filteredJobs.length} available roles
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <a
+                        href="/micro1-referral-jobs.xlsx"
+                        download="micro1-referral-jobs.xlsx"
+                        className="text-xs font-bold bg-white text-gray-700 hover:text-[#2e5c17] px-3 py-1.5 rounded-lg border border-gray-200 hover:border-[#77ab3b] flex items-center gap-1.5 transition shadow-xs"
+                        title="Download all jobs in Excel (.xlsx) format"
+                      >
+                        <Download size={13} /> Export Excel (.xlsx)
+                      </a>
+                      <div className="text-xs font-bold bg-[#edf7e3] text-[#2e5c17] px-3 py-1.5 rounded-lg border border-[#d2ebd5]">
+                        Showing {filteredJobs.length} available roles
+                      </div>
                     </div>
                   </div>
 
@@ -1469,10 +1479,27 @@ ${resumeEducation}
                               </button>
                               <button
                                 onClick={() => setSelected(j)}
-                                className="px-4 py-2 bg-[#182319] hover:bg-[#2b421e] text-white text-xs font-bold rounded-lg transition shadow-sm"
+                                className="px-3 py-2 border border-gray-200 hover:bg-gray-50 text-gray-700 text-xs font-semibold rounded-lg transition"
                               >
-                                Apply Now
+                                Details
                               </button>
+                              {j.externalUrl ? (
+                                <a
+                                  href={j.externalUrl}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="px-4 py-2 bg-[#182319] hover:bg-[#2b421e] text-[#c4f568] text-xs font-bold rounded-lg transition shadow-sm inline-flex items-center gap-1.5"
+                                >
+                                  Apply Now <ExternalLink size={13} />
+                                </a>
+                              ) : (
+                                <button
+                                  onClick={() => setSelected(j)}
+                                  className="px-4 py-2 bg-[#182319] hover:bg-[#2b421e] text-white text-xs font-bold rounded-lg transition shadow-sm"
+                                >
+                                  Apply Now
+                                </button>
+                              )}
                             </div>
                           </div>
                         </div>
@@ -2400,17 +2427,28 @@ ${resumeEducation}
               <div className="flex items-center gap-2">
                 <button
                   onClick={() => setSelected(null)}
-                  className="flex-1 py-2.5 border border-gray-300 hover:bg-gray-50 text-gray-700 text-xs font-bold rounded-xl transition"
+                  className="px-4 py-2.5 border border-gray-300 hover:bg-gray-50 text-gray-700 text-xs font-bold rounded-xl transition"
                 >
-                  Cancel
+                  Close
                 </button>
-                <button
-                  onClick={apply}
-                  disabled={saving}
-                  className="flex-1 py-2.5 bg-[#182319] hover:bg-[#2b421e] text-[#c4f568] text-xs font-bold rounded-xl transition shadow-sm"
-                >
-                  {saving ? 'Submitting...' : 'Confirm Application'}
-                </button>
+                {selected.externalUrl ? (
+                  <a
+                    href={selected.externalUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex-1 py-2.5 bg-[#182319] hover:bg-[#2b421e] text-[#c4f568] text-xs font-bold rounded-xl transition shadow-sm text-center inline-flex items-center justify-center gap-1.5"
+                  >
+                    Apply on Micro1 (Referral Link) <ExternalLink size={13} />
+                  </a>
+                ) : (
+                  <button
+                    onClick={apply}
+                    disabled={saving}
+                    className="flex-1 py-2.5 bg-[#182319] hover:bg-[#2b421e] text-[#c4f568] text-xs font-bold rounded-xl transition shadow-sm"
+                  >
+                    {saving ? 'Submitting...' : 'Confirm Application'}
+                  </button>
+                )}
               </div>
             </div>
           )}
