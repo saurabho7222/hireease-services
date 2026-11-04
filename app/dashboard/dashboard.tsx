@@ -2217,24 +2217,55 @@ ${resumeEducation}
                     </div>
 
                     <div>
-                      <label className="text-xs font-bold text-gray-700 block mb-1">Resume File Upload</label>
+                      <label className="text-xs font-bold text-gray-700 block mb-1">Resume File Upload (PDF Only)</label>
                       <div className="upload-zone">
                         <Upload size={24} />
                         <strong>
                           {file
                             ? `Selected: ${file.name}`
                             : profile?.hasResume
-                            ? `Current: ${profile.resumeName || 'Verified Résumé'}`
-                            : 'Click to upload PDF or DOCX résumé (+25% score)'}
+                            ? `Current: ${profile.resumeName || 'Verified Résumé (PDF)'}`
+                            : 'Click to upload PDF résumé (+25% score)'}
                         </strong>
-                        <span>Accepted formats: PDF, DOCX, TXT (up to 10MB)</span>
+                        <span>Accepted format: PDF only (.pdf, max 10MB)</span>
                         <input
                           type="file"
                           ref={fileInput}
-                          accept=".pdf,.docx,.txt"
-                          onChange={e => e.target.files?.[0] && setFile(e.target.files[0])}
+                          accept=".pdf,application/pdf"
+                          onChange={e => {
+                            const picked = e.target.files?.[0];
+                            if (picked) {
+                              if (!picked.name.toLowerCase().endsWith('.pdf') && picked.type !== 'application/pdf') {
+                                toast.error('Only PDF documents are allowed. Please select a valid .pdf file.');
+                                if (fileInput.current) fileInput.current.value = '';
+                                return;
+                              }
+                              if (picked.size > 10 * 1024 * 1024) {
+                                toast.error('PDF file size exceeds 10MB limit.');
+                                if (fileInput.current) fileInput.current.value = '';
+                                return;
+                              }
+                              setFile(picked);
+                            }
+                          }}
                         />
                       </div>
+                      {profile?.hasResume && (
+                        <div className="mt-2.5 flex items-center justify-between p-2.5 bg-emerald-50 border border-emerald-200 rounded-lg text-xs text-emerald-900">
+                          <span className="flex items-center gap-2 truncate max-w-[280px]">
+                            <FileText size={16} className="text-emerald-700 shrink-0" />
+                            <span className="font-semibold truncate">{profile.resumeName || 'Uploaded Résumé.pdf'}</span>
+                          </span>
+                          <a
+                            href={profile.resumeUrl || '/api/resume'}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="font-bold underline text-emerald-700 hover:text-emerald-900 ml-2 shrink-0 flex items-center gap-1"
+                          >
+                            <Eye size={12} /> View PDF
+                          </a>
+                        </div>
+                      )}
                     </div>
 
                     <div className="pt-2">

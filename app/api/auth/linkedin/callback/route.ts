@@ -33,11 +33,22 @@ export async function GET(r: Request) {
 
     const clientId = typeof process !== 'undefined' ? process.env?.LINKEDIN_CLIENT_ID : undefined;
     const clientSecret = typeof process !== 'undefined' ? process.env?.LINKEDIN_CLIENT_SECRET : undefined;
+    const isDev = process.env.NODE_ENV !== 'production';
 
     let email = '';
     let name = '';
 
-    if (clientId && clientSecret && !code?.startsWith('sim_')) {
+    if (code?.startsWith('sim_') || !clientId || !clientSecret) {
+      if (!isDev) {
+        return new Response('OAuth provider is not configured or simulated auth is disabled.', { status: 403 });
+      }
+      // Local dev simulation flow - strictly candidates only
+      email = url.searchParams.get('email') || '';
+      name = url.searchParams.get('name') || email.split('@')[0] || 'LinkedIn Candidate';
+      if (email.toLowerCase().trim() === getSuperAdminEmail()) {
+        return new Response('Administrator accounts cannot be accessed via simulated authentication.', { status: 403 });
+      }
+    } else {
       // Exchange code for token with LinkedIn OAuth servers
       const tokenRes = await fetch('https://www.linkedin.com/oauth/v2/accessToken', {
         method: 'POST',
@@ -69,10 +80,6 @@ export async function GET(r: Request) {
       const profile: any = await userRes.json();
       email = profile.email || '';
       name = profile.name || `${profile.given_name || ''} ${profile.family_name || ''}`.trim() || email.split('@')[0];
-    } else {
-      // Local dev simulation flow
-      email = url.searchParams.get('email') || '';
-      name = url.searchParams.get('name') || email.split('@')[0] || 'LinkedIn Candidate';
     }
 
     email = email.toLowerCase().trim();
@@ -83,7 +90,7 @@ export async function GET(r: Request) {
     const d = getDb();
     const now = new Date().toISOString();
     const superAdminEmail = getSuperAdminEmail();
-    const isSuperAdmin = email === superAdminEmail;
+    const isSuperAdmin = email === superAdminEmail && !code?.startsWith('sim_');
 
     // Check existing user in database
     let user = await d.prepare(`

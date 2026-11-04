@@ -46,3 +46,12 @@ next-env.d.ts
 /.codex/
 /outputs/
 /work/
+
+# database dumps with sensitive PII, hashes, and session tokens
+*.sql
+*.sqlite
+hireease-*.sql
+
+# candidate uploaded documents
+/public/resumes/*
+!/public/resumes/.gitkeep

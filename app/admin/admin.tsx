@@ -978,6 +978,8 @@ export default function Admin({ email }: { email: string }) {
 
                               <a
                                 href={'/api/resume?application=' + a.id}
+                                target="_blank"
+                                rel="noopener noreferrer"
                                 className="px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl text-xs font-bold transition flex items-center gap-1.5"
                                 title="Download submitted PDF resume"
                               >
@@ -1109,6 +1111,8 @@ export default function Admin({ email }: { email: string }) {
                           {c.hasResume && (
                             <a
                               href={'/api/resume?candidate=' + encodeURIComponent(c.userId)}
+                              target="_blank"
+                              rel="noopener noreferrer"
                               className="font-bold text-gray-600 hover:text-[#182319] flex items-center gap-1"
                             >
                               <Download size={13} /> Download CV
@@ -1668,6 +1672,8 @@ export default function Admin({ email }: { email: string }) {
                 <div className="flex items-center gap-2">
                   <a
                     href={'/api/resume?application=' + selectedApplication.id}
+                    target="_blank"
+                    rel="noopener noreferrer"
                     className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-800 rounded-xl text-xs font-bold transition flex items-center gap-1.5"
                   >
                     <Download size={14} /> Download Submitted Résumé
@@ -1739,6 +1745,8 @@ export default function Admin({ email }: { email: string }) {
                   <div className="pt-2">
                     <a
                       href={'/api/resume?candidate=' + encodeURIComponent(candidate.userId)}
+                      target="_blank"
+                      rel="noopener noreferrer"
                       className="inline-flex items-center gap-1.5 px-4 py-2 bg-[#182319] text-[#c4f568] rounded-xl font-bold text-xs"
                     >
                       <Download size={14} /> Download Current Résumé

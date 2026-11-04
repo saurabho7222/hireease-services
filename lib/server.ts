@@ -18,10 +18,12 @@ export async function user(){
   }
   const u=await getChatGPTUser();
   if(!u)throw new ApiError('Please sign in to continue.',401);
-  return { ...u, role: (u.email === 'admin@hireease.com' ? 'admin' : 'candidate') as 'admin' | 'candidate' };
+  const dbUser = await db().prepare('SELECT role FROM users WHERE id = ? OR email = ?').bind(u.userId, u.email).first<{ role: string }>();
+  const verifiedRole: 'admin' | 'candidate' = dbUser?.role === 'admin' ? 'admin' : 'candidate';
+  return { ...u, role: verifiedRole };
 }
 export class ApiError extends Error{constructor(message:string,public status=400){super(message)}}
-export function sameOrigin(r:Request){const origin=r.headers.get('origin');if(origin&&origin!==new URL(r.url).origin)throw new ApiError('Request origin is not permitted.',403)}
+export function sameOrigin(r:Request){const origin=r.headers.get('origin');const secFetchSite=r.headers.get('sec-fetch-site');if(secFetchSite==='cross-site')throw new ApiError('Cross-site request is not permitted.',403);if(origin&&origin!==new URL(r.url).origin)throw new ApiError('Request origin is not permitted.',403)}
 export async function body(r:Request){sameOrigin(r);if(!r.headers.get('content-type')?.includes('application/json'))throw new ApiError('Send a JSON request.',415);const t=await r.text();if(t.length>40000)throw new ApiError('This request is too large.',413);try{return JSON.parse(t)}catch{throw new ApiError('Invalid request.')}}
 export async function staffUser(){
   const u=await user();
@@ -38,7 +40,7 @@ export async function isStaff(id:string){
 }
 export function fail(e:unknown){if(e instanceof ApiError)return json({error:e.message},e.status);if(e instanceof z.ZodError)return json({error:e.issues[0]?.message||'Please check the information you entered.'},400);console.error('HireEase request failed',e instanceof Error?e.message:'Storage error');return json({error:'This service is temporarily unavailable. Please try again.'},503)}
 export const profileSchema=z.object({name:z.string().trim().min(2,'Enter your full name.').max(120),address:z.string().trim().min(3,'Enter your address.').max(500),city:z.string().trim().min(2,'Enter your city.').max(120),country:z.string().trim().min(2,'Enter your country.').max(120),education:z.string().trim().min(2,'Enter your education.').max(200),institution:z.string().trim().min(2,'Enter your institution.').max(200),graduationYear:z.string().regex(/^(19|20|21)\d{2}$/,'Enter a four-digit graduation year.'),skills:z.array(z.string().trim().min(2).max(100)).min(1,'Add at least one skill.').max(30),experience:z.string().trim().min(10,'Tell us a little about your experience.').max(5000),consent:z.literal(true,{errorMap:()=>({message:'Please agree to profile processing.'})})});
-export function publicProfile(p:any){return{userId:p.user_id,email:p.email,name:p.name,address:p.address,city:p.city,country:p.country,education:p.education,institution:p.institution,graduationYear:p.graduation_year,skills:JSON.parse(p.skills),experience:p.experience,resumeName:p.resume_name,hasResume:!!p.resume_key,updatedAt:p.updated_at}}
+export function publicProfile(p:any){const resumeUrl=p.resume_key?(p.resume_key.startsWith('http')||p.resume_key.startsWith('/')?p.resume_key:'/'+p.resume_key):null;return{userId:p.user_id,email:p.email,name:p.name,address:p.address,city:p.city,country:p.country,education:p.education,institution:p.institution,graduationYear:p.graduation_year,skills:JSON.parse(p.skills),experience:p.experience,resumeName:p.resume_name,resumeUrl,hasResume:!!p.resume_key,updatedAt:p.updated_at}}
 export function jobRow(j:any){return{id:j.id,title:j.title,company:j.company,category:j.category,location:j.location,type:j.type,experience:j.experience,compensation:j.compensation,description:j.description,skills:JSON.parse(j.skills),responsibilities:JSON.parse(j.responsibilities),isSample:false,status:j.status,createdAt:j.created_at}}
 export const jobSchema=z.object({title:z.string().trim().min(3).max(150),company:z.string().trim().min(2).max(150),category:z.string().trim().min(2).max(100),location:z.string().trim().min(2).max(150),type:z.enum(['Contract','Full-time','Part-time','Freelance']),experience:z.string().trim().min(2).max(200),compensation:z.string().trim().min(2).max(200),description:z.string().trim().min(20).max(3000),skills:z.array(z.string().trim().min(2).max(100)).min(1).max(20),responsibilities:z.array(z.string().trim().min(5).max(500)).min(1).max(15),status:z.enum(['open','closed']).default('open')});
 export function setupKey(){return (env as unknown as {ADMIN_SETUP_KEY?:string}).ADMIN_SETUP_KEY}

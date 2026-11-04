@@ -1,4 +1,4 @@
-import { json } from '@/lib/server';
+import { json, staffUser, fail, ApiError } from '@/lib/server';
 import { getGoogleConfig, saveGoogleConfig } from '@/lib/oauth-config';
 
 export async function GET() {
@@ -11,21 +11,29 @@ export async function GET() {
 
 export async function POST(r: Request) {
   try {
+    // Only authenticated administrator/recruiter staff can update OAuth configuration
+    await staffUser();
+
     let body: any;
     try {
       body = await r.json();
     } catch {
-      return json({ error: 'Invalid JSON request body.' }, 400);
+      throw new ApiError('Invalid JSON request body.', 400);
     }
 
     const { clientId, clientSecret } = body || {};
     if (!clientId || typeof clientId !== 'string' || clientId.trim().length < 5) {
-      return json({ error: 'Please provide a valid Google Client ID.' }, 400);
+      throw new ApiError('Please provide a valid Google Client ID.', 400);
     }
 
-    const saved = saveGoogleConfig(clientId, clientSecret);
+    // Prevent CRLF / Newline Injection
+    if (/[\r\n]/.test(clientId) || (clientSecret && /[\r\n]/.test(clientSecret))) {
+      throw new ApiError('Credentials cannot contain newline or carriage return characters.', 400);
+    }
+
+    const saved = saveGoogleConfig(clientId.trim(), typeof clientSecret === 'string' ? clientSecret.trim() : undefined);
     if (!saved) {
-      return json({ error: 'Failed to write credentials to .env configuration.' }, 500);
+      throw new ApiError('Failed to write credentials to configuration storage.', 500);
     }
 
     return json({
@@ -35,6 +43,6 @@ export async function POST(r: Request) {
       clientId: clientId.trim()
     });
   } catch (err: any) {
-    return json({ error: err.message || 'Failed to update Google configuration.' }, 500);
+    return fail(err);
   }
 }

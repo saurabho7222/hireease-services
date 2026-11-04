@@ -5,6 +5,11 @@ import { Sparkles, Eye, EyeOff, ArrowLeft, Mail, RefreshCw, CheckCircle2, Shield
 import { Brand } from '@/app/home';
 import { Toaster, toast } from 'sonner';
 
+function isSafeLocalUrl(url: string | null | undefined): boolean {
+  if (!url || typeof url !== 'string') return false;
+  return url.startsWith('/') && !url.startsWith('//') && !url.startsWith('/\\');
+}
+
 export default function AuthClient({
   initialMode = 'signin',
   returnTo = ''
@@ -91,8 +96,8 @@ export default function AuthClient({
           : `Welcome back, ${data.user?.name || 'Candidate'}!`
       );
 
-      const destination = returnTo && returnTo.startsWith('/')
-        ? returnTo
+      const destination = isSafeLocalUrl(returnTo)
+        ? returnTo!
         : data.redirectUrl || (data.user?.role === 'admin' ? '/admin' : '/dashboard');
 
       setTimeout(() => {
@@ -131,8 +136,8 @@ export default function AuthClient({
 
       toast.success('Email verified successfully! Welcome to HireEase.');
 
-      const destination = returnTo && returnTo.startsWith('/')
-        ? returnTo
+      const destination = isSafeLocalUrl(returnTo)
+        ? returnTo!
         : data.redirectUrl || '/dashboard';
 
       setTimeout(() => {

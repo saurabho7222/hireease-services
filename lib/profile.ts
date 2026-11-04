@@ -11,6 +11,7 @@ export type Profile = {
   skills: string[];
   experience: string;
   resumeName: string | null;
+  resumeUrl?: string | null;
   hasResume: boolean;
   updatedAt: string;
   phone?: string;

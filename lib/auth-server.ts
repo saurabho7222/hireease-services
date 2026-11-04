@@ -18,7 +18,7 @@ export function getSuperAdminEmail(): string {
   return (process.env.SUPER_ADMIN_EMAIL || 'admin@hireease.com').toLowerCase().trim();
 }
 
-export const DESIGNATED_ADMIN_DEFAULT_PASSWORD = 'Admin@12345';
+export const DESIGNATED_ADMIN_DEFAULT_PASSWORD = process.env.ADMIN_INITIAL_PASSWORD || 'Admin@12345';
 
 export const DEMO_CANDIDATE_EMAIL = 'candidate@hireease.com';
 export const DEMO_CANDIDATE_DEFAULT_PASSWORD = 'Candidate@12345';
@@ -58,9 +58,17 @@ export function generateSalt(): string {
   return Array.from(bytes).map(b => b.toString(16).padStart(2, '0')).join('');
 }
 
+/**
+ * Timing-safe string comparison to protect against side-channel timing attacks
+ */
 export async function verifyPassword(password: string, salt: string, storedHash: string): Promise<boolean> {
   const computed = await hashPassword(password, salt);
-  return computed === storedHash;
+  if (computed.length !== storedHash.length) return false;
+  let diff = 0;
+  for (let i = 0; i < computed.length; i++) {
+    diff |= computed.charCodeAt(i) ^ storedHash.charCodeAt(i);
+  }
+  return diff === 0;
 }
 
 let tablesInitialized = false;
@@ -76,7 +84,7 @@ export async function ensureAuthTables(): Promise<void> {
     await d.prepare(`CREATE TABLE IF NOT EXISTS sessions (id TEXT PRIMARY KEY NOT NULL, user_id TEXT NOT NULL, role TEXT NOT NULL, expires_at TEXT NOT NULL, created_at TEXT NOT NULL)`).run();
     await d.prepare(`CREATE TABLE IF NOT EXISTS outbox_emails (id TEXT PRIMARY KEY NOT NULL, recipient_email TEXT NOT NULL, recipient_name TEXT, subject TEXT NOT NULL, text_content TEXT, html_content TEXT, status TEXT NOT NULL DEFAULT 'sent', sent_at TEXT NOT NULL)`).run();
     await d.prepare(`CREATE TABLE IF NOT EXISTS admin_access_requests (id TEXT PRIMARY KEY NOT NULL, user_id TEXT NOT NULL, email TEXT NOT NULL, name TEXT NOT NULL, reason TEXT NOT NULL, status TEXT NOT NULL DEFAULT 'pending', created_at TEXT NOT NULL, reviewed_at TEXT, reviewed_by TEXT)`).run();
-    await d.prepare(`CREATE TABLE IF NOT EXISTS email_verifications (id TEXT PRIMARY KEY NOT NULL, email TEXT NOT NULL, otp TEXT NOT NULL, expires_at TEXT NOT NULL, created_at TEXT NOT NULL)`).run();
+    await d.prepare(`CREATE TABLE IF NOT EXISTS email_verifications (id TEXT PRIMARY KEY NOT NULL, email TEXT NOT NULL, otp TEXT NOT NULL, expires_at TEXT NOT NULL, created_at TEXT NOT NULL, attempts INTEGER NOT NULL DEFAULT 0)`).run();
     await d.prepare(`CREATE INDEX IF NOT EXISTS idx_sessions_user_id ON sessions (user_id)`).run();
     await d.prepare(`CREATE UNIQUE INDEX IF NOT EXISTS idx_users_email ON users (email)`).run();
     await d.prepare(`CREATE INDEX IF NOT EXISTS idx_verifications_email ON email_verifications (email)`).run();
@@ -84,6 +92,11 @@ export async function ensureAuthTables(): Promise<void> {
     // Ensure email_verified column exists in case users table already existed
     try {
       await d.prepare(`ALTER TABLE users ADD COLUMN email_verified INTEGER NOT NULL DEFAULT 0`).run();
+    } catch {}
+
+    // Ensure attempts column exists in email_verifications
+    try {
+      await d.prepare(`ALTER TABLE email_verifications ADD COLUMN attempts INTEGER NOT NULL DEFAULT 0`).run();
     } catch {}
   } catch (e) {
     console.warn('Table initialization warning:', e);
@@ -173,11 +186,13 @@ export function parseCookieHeader(cookieHeader: string | null): Record<string, s
 }
 
 export function buildSessionCookie(sessionId: string): string {
-  return `${SESSION_COOKIE_NAME}=${encodeURIComponent(sessionId)}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${SESSION_MAX_AGE_SECONDS}`;
+  const isSecure = process.env.NODE_ENV === 'production';
+  return `${SESSION_COOKIE_NAME}=${encodeURIComponent(sessionId)}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${SESSION_MAX_AGE_SECONDS}${isSecure ? '; Secure' : ''}`;
 }
 
 export function buildClearSessionCookie(): string {
-  return `${SESSION_COOKIE_NAME}=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0; Expires=Thu, 01 Jan 1970 00:00:00 GMT`;
+  const isSecure = process.env.NODE_ENV === 'production';
+  return `${SESSION_COOKIE_NAME}=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0; Expires=Thu, 01 Jan 1970 00:00:00 GMT${isSecure ? '; Secure' : ''}`;
 }
 
 /**
@@ -378,10 +393,12 @@ export async function revokeAdminRole(userId: string, revokedBy: string): Promis
 }
 
 /**
- * Generate 6-digit random verification code
+ * Generate cryptographically secure 6-digit random verification code
  */
 export function generateOtp(): string {
-  return Math.floor(100000 + Math.random() * 900000).toString();
+  const bytes = new Uint32Array(1);
+  crypto.getRandomValues(bytes);
+  return (100000 + (bytes[0] % 900000)).toString();
 }
 
 /**
@@ -393,6 +410,22 @@ export async function createAndSendEmailOtp(email: string, name: string, forceNe
   const d = getDb();
   const normalizedEmail = email.toLowerCase().trim();
   const now = new Date();
+
+  // Rate Limiting: Prevent generating/re-sending OTPs more than once every 30 seconds
+  const recent = await d.prepare(`
+    SELECT created_at
+    FROM email_verifications
+    WHERE email = ?
+    ORDER BY created_at DESC
+    LIMIT 1
+  `).bind(normalizedEmail).first<{ created_at: string }>();
+
+  if (recent) {
+    const elapsedMs = now.getTime() - new Date(recent.created_at).getTime();
+    if (elapsedMs < 30 * 1000) {
+      throw new Error('Please wait at least 30 seconds before requesting another verification code.');
+    }
+  }
 
   // If forceNew is false, check if an unexpired OTP already exists for this email
   if (!forceNew) {
@@ -422,10 +455,10 @@ export async function createAndSendEmailOtp(email: string, name: string, forceNe
   // Invalidate previous OTPs for this email
   await d.prepare('DELETE FROM email_verifications WHERE email = ?').bind(normalizedEmail).run();
 
-  // Save new OTP
+  // Save new OTP with 0 initial attempts
   await d.prepare(`
-    INSERT INTO email_verifications (id, email, otp, expires_at, created_at)
-    VALUES (?, ?, ?, ?, ?)
+    INSERT INTO email_verifications (id, email, otp, expires_at, created_at, attempts)
+    VALUES (?, ?, ?, ?, ?, 0)
   `).bind(id, normalizedEmail, otp, expiresAt, now.toISOString()).run();
 
   // Dispatch email
@@ -439,7 +472,7 @@ export async function createAndSendEmailOtp(email: string, name: string, forceNe
 }
 
 /**
- * Verifies the 6-digit email OTP
+ * Verifies the 6-digit email OTP with attempt limits to block brute-force attacks
  */
 export async function verifyEmailOtp(email: string, otp: string): Promise<{ success: boolean; error?: string }> {
   await ensureAuthTables();
@@ -448,19 +481,44 @@ export async function verifyEmailOtp(email: string, otp: string): Promise<{ succ
   const now = new Date().toISOString();
 
   const record = await d.prepare(`
-    SELECT id, otp, expires_at
+    SELECT id, otp, expires_at, attempts
     FROM email_verifications
-    WHERE email = ? AND otp = ?
+    WHERE email = ?
     ORDER BY created_at DESC
     LIMIT 1
-  `).bind(normalizedEmail, otp.trim()).first<{ id: string; otp: string; expires_at: string }>();
+  `).bind(normalizedEmail).first<{ id: string; otp: string; expires_at: string; attempts: number }>();
 
   if (!record) {
-    return { success: false, error: 'Invalid verification code. Please check and try again.' };
+    return { success: false, error: 'No verification code requested or session expired. Please request a new code.' };
   }
 
   if (record.expires_at < now) {
+    await d.prepare('DELETE FROM email_verifications WHERE id = ?').bind(record.id).run();
     return { success: false, error: 'Verification code has expired. Please request a new code.' };
+  }
+
+  const currentAttempts = record.attempts || 0;
+  if (currentAttempts >= 5) {
+    await d.prepare('DELETE FROM email_verifications WHERE id = ?').bind(record.id).run();
+    return { success: false, error: 'Too many failed verification attempts. This code has been invalidated for security. Please request a new code.' };
+  }
+
+  // Constant-time comparison to prevent timing leaks
+  const enteredOtp = otp.trim();
+  let diff = enteredOtp.length ^ record.otp.length;
+  for (let i = 0; i < enteredOtp.length && i < record.otp.length; i++) {
+    diff |= enteredOtp.charCodeAt(i) ^ record.otp.charCodeAt(i);
+  }
+
+  if (diff !== 0) {
+    const nextAttempts = currentAttempts + 1;
+    await d.prepare('UPDATE email_verifications SET attempts = ? WHERE id = ?').bind(nextAttempts, record.id).run();
+    const remaining = 5 - nextAttempts;
+    if (remaining <= 0) {
+      await d.prepare('DELETE FROM email_verifications WHERE id = ?').bind(record.id).run();
+      return { success: false, error: 'Maximum attempts exceeded. This code has been invalidated for security. Please request a new code.' };
+    }
+    return { success: false, error: `Invalid verification code. ${remaining} attempt${remaining === 1 ? '' : 's'} remaining.` };
   }
 
   // Remove verified OTP

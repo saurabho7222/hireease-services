@@ -111,6 +111,12 @@ export function saveGoogleConfig(clientId: string, clientSecret?: string): boole
     const cleanClientId = clientId.trim();
     const cleanSecret = (clientSecret || '').trim();
 
+    // Prevent CRLF / newline environment injection
+    if (/[\r\n]/.test(cleanClientId) || /[\r\n]/.test(cleanSecret)) {
+      console.error('Invalid characters in OAuth credentials.');
+      return false;
+    }
+
     // Replace or add GOOGLE_CLIENT_ID
     if (/^[#\s]*GOOGLE_CLIENT_ID=.*/m.test(content)) {
       content = content.replace(/^[#\s]*GOOGLE_CLIENT_ID=.*/m, `GOOGLE_CLIENT_ID=${cleanClientId}`);
@@ -230,6 +236,12 @@ export function saveGitHubConfig(clientId: string, clientSecret?: string): boole
 
     const cleanClientId = clientId.trim();
     const cleanSecret = (clientSecret || '').trim();
+
+    // Prevent CRLF / newline environment injection
+    if (/[\r\n]/.test(cleanClientId) || /[\r\n]/.test(cleanSecret)) {
+      console.error('Invalid characters in OAuth credentials.');
+      return false;
+    }
 
     if (/^[#\s]*GITHUB_CLIENT_ID=.*/m.test(content)) {
       content = content.replace(/^[#\s]*GITHUB_CLIENT_ID=.*/m, `GITHUB_CLIENT_ID=${cleanClientId}`);
