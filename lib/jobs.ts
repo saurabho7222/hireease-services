@@ -23,9 +23,9 @@ export type Job = {
 
 export const trackedPlatforms = [
   'micro1.',
+  'Mercor',
   'sme.careers',
   'Labelbox',
-  'MERCOR',
   'xAI',
   'Alignerr',
   'Anthropic',
