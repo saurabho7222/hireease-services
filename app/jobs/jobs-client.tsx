@@ -167,6 +167,22 @@ export default function JobsClient() {
     }
   };
 
+  const getCleanExcerpt = (desc: string): string => {
+    if (!desc) return '';
+    let text = desc
+      .replace(/^Role Title:[\s\S]*?(?=Role Type:|$)/i, '')
+      .replace(/^Role Type:[\s\S]*?(?=Location:|$)/i, '')
+      .replace(/^Location:[\s\S]*?(?=(micro1|We are|In this role|About the opportunity|About micro1|$))/i, '')
+      .replace(/^(About micro1:?|micro1 is engaging:?|We are engaging:?|In this role,?\s*)/i, '')
+      .replace(/\s+/g, ' ')
+      .trim();
+    if (!text) text = desc.replace(/\s+/g, ' ').trim();
+    if (text.length > 120) {
+      return text.slice(0, 120).trim() + '…';
+    }
+    return text;
+  };
+
   // Start application flow
   const initiateApplication = async (job: Job, e?: React.MouseEvent) => {
     if (e) {
@@ -486,11 +502,11 @@ export default function JobsClient() {
                 return (
                   <article
                     key={job.id}
-                    className="bg-white border border-[#dce5d4] hover:border-[#77ab3b] rounded-2xl p-5 sm:p-6 shadow-xs hover:shadow-md transition-all flex flex-col justify-between group"
+                    className="bg-white border border-[#dce5d4] hover:border-[#77ab3b] rounded-2xl p-5 shadow-xs hover:shadow-md transition-all flex flex-col justify-between group sm:aspect-square sm:max-h-[390px] min-h-[350px] overflow-hidden"
                   >
                     <div>
                       {/* Top Badges */}
-                      <div className="flex items-center justify-between gap-2 mb-3 flex-wrap">
+                      <div className="flex items-center justify-between gap-2 mb-2 flex-wrap">
                         <div className="flex items-center gap-1.5 flex-wrap">
                           <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-[#edf7e3] text-[#2e5c17] border border-[#d2ebd5] flex items-center gap-1">
                             <span className="w-1.5 h-1.5 rounded-full bg-[#468c22]"></span>
@@ -509,44 +525,44 @@ export default function JobsClient() {
                       </div>
 
                       {/* Position Title */}
-                      <h3 className="text-base font-bold text-gray-900 group-hover:text-[#2e5c17] transition line-clamp-2 mb-2 leading-snug">
+                      <h3 className="text-base font-bold text-gray-900 group-hover:text-[#2e5c17] transition line-clamp-2 mb-2 leading-snug h-[42px] overflow-hidden">
                         <Link href={`/jobs/${job.id}`}>
                           {job.title}
                         </Link>
                       </h3>
 
                       {/* Compensation & Meta */}
-                      <div className="flex items-center gap-3 text-xs mb-3 flex-wrap">
+                      <div className="flex items-center gap-3 text-xs mb-2 flex-wrap">
                         <span className="font-extrabold text-[#182319] bg-[#f2f8ee] px-2 py-0.5 rounded border border-[#d2ebd5]">
                           {job.compensation}
                         </span>
-                        <span className="text-gray-500 flex items-center gap-1">
+                        <span className="text-gray-500 flex items-center gap-1 text-[11px]">
                           <MapPin size={12} /> {job.location || 'Remote'}
                         </span>
-                        <span className="text-gray-500 flex items-center gap-1">
+                        <span className="text-gray-500 flex items-center gap-1 text-[11px]">
                           <Clock size={12} /> {job.type || 'Contract'}
                         </span>
                       </div>
 
-                      {/* Description Snippet */}
-                      <p className="text-xs text-gray-600 line-clamp-3 mb-4 leading-relaxed">
-                        {job.description}
+                      {/* Description Snippet (Shrunk to 2 lines) */}
+                      <p className="text-xs text-gray-600 line-clamp-2 mb-3 leading-relaxed max-h-[36px] overflow-hidden">
+                        {getCleanExcerpt(job.description)}
                       </p>
 
                       {/* Skills Chips */}
                       {job.skills && job.skills.length > 0 && (
-                        <div className="flex items-center gap-1.5 flex-wrap mb-4">
-                          {job.skills.slice(0, 4).map(skill => (
+                        <div className="flex items-center gap-1.5 flex-wrap mb-2 max-h-[26px] overflow-hidden">
+                          {job.skills.slice(0, 3).map(skill => (
                             <span
                               key={skill}
-                              className="text-[11px] font-medium bg-gray-50 text-gray-600 border border-gray-200 px-2 py-0.5 rounded"
+                              className="text-[10.5px] font-medium bg-gray-50 text-gray-600 border border-gray-200 px-2 py-0.5 rounded truncate"
                             >
                               {skill}
                             </span>
                           ))}
-                          {job.skills.length > 4 && (
-                            <span className="text-[10px] font-bold text-gray-400">
-                              +{job.skills.length - 4} more
+                          {job.skills.length > 3 && (
+                            <span className="text-[10px] font-bold text-gray-400 bg-gray-100 px-1.5 py-0.5 rounded">
+                              +{job.skills.length - 3}
                             </span>
                           )}
                         </div>
@@ -554,7 +570,7 @@ export default function JobsClient() {
                     </div>
 
                     {/* Card Actions Footer */}
-                    <div className="pt-4 border-t border-gray-100 flex items-center justify-between gap-2 mt-2">
+                    <div className="pt-3 border-t border-gray-100 flex items-center justify-between gap-2 mt-auto">
                       <div className="flex items-center gap-1.5">
                         <button
                           onClick={e => shareRole(job, e)}

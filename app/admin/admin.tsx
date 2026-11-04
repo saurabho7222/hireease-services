@@ -70,6 +70,9 @@ export default function Admin({ email }: { email: string }) {
   const [jobType, setJobType] = useState('Contract');
   const [jobStatus, setJobStatus] = useState('open');
   const [formError, setFormError] = useState('');
+
+  // Super Admin flag: designated email or API verification
+  const isSuperAdminUser = (email && (email.toLowerCase() === 'saurabho7222@gmail.com' || email.toLowerCase() === 'admin@hireease.com')) || Boolean(accessData?.isSuperAdmin);
   const [candidate, setCandidate] = useState<Profile | null>(null);
 
   // ATS Filters and Search States
@@ -598,31 +601,16 @@ export default function Admin({ email }: { email: string }) {
         ) : !data ? (
           <section className="bg-white border border-[#dce5d4] rounded-2xl p-8 max-w-xl mx-auto shadow-sm text-center">
             <ShieldCheck size={40} className="text-[#2e5c17] mx-auto mb-4" />
-            <h2 className="text-xl font-bold text-[#182319] mb-2">Activate your recruiter workspace</h2>
+            <h2 className="text-xl font-bold text-[#182319] mb-2">Connecting to Recruiter Workspace</h2>
             <p className="text-xs text-gray-500 mb-6">
-              Only authorized recruiters can manage jobs or view candidate details. Use the one-time setup code.
+              Synchronizing verified ATS applications, talent pipeline, and administrator credentials.
             </p>
-            <form onSubmit={activate} className="space-y-4 text-left">
-              <div>
-                <label className="block text-xs font-bold text-gray-700 mb-1">Workspace setup code</label>
-                <input
-                  type="password"
-                  autoComplete="off"
-                  required
-                  value={setup}
-                  onChange={e => setSetup(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#2e5c17]"
-                />
-              </div>
-              {error && <p className="text-xs text-red-600">{error}</p>}
-              <button
-                type="submit"
-                disabled={saving}
-                className="w-full py-2.5 bg-[#182319] hover:bg-[#2b421e] text-[#c4f568] font-bold text-xs rounded-xl transition shadow-xs"
-              >
-                {saving ? 'Activating…' : 'Activate Workspace'}
-              </button>
-            </form>
+            <button
+              onClick={() => { setLoading(true); load(); }}
+              className="px-6 py-2.5 bg-[#182319] hover:bg-[#2b421e] text-[#c4f568] font-bold text-xs rounded-xl transition shadow-xs cursor-pointer"
+            >
+              Refresh Workspace
+            </button>
           </section>
         ) : (
           <>
@@ -1301,10 +1289,10 @@ export default function Admin({ email }: { email: string }) {
                       <h3 className="text-sm font-bold text-[#182319]">Active Administrators</h3>
                       <p className="text-xs text-gray-500">Manage recruiter and administrator privileges for team members.</p>
                     </div>
-                    {accessData?.isSuperAdmin && (
+                    {isSuperAdminUser && (
                       <button
                         onClick={() => setAddAdminModalOpen(true)}
-                        className="px-4 py-2 bg-[#182319] hover:bg-[#2b421e] text-[#c4f568] text-xs font-bold rounded-xl flex items-center gap-1.5 transition shadow-xs self-start sm:self-auto"
+                        className="px-4 py-2 bg-[#182319] hover:bg-[#2b421e] text-[#c4f568] text-xs font-bold rounded-xl flex items-center gap-1.5 transition shadow-xs self-start sm:self-auto cursor-pointer"
                       >
                         <UserPlus size={15} /> Add New Admin
                       </button>
@@ -1312,9 +1300,11 @@ export default function Admin({ email }: { email: string }) {
                   </div>
 
                   <div className="space-y-3">
-                    {accessData?.admins && accessData.admins.length > 0 ? (
-                      accessData.admins.map((adm: any) => {
-                        const isSuper = adm.email?.toLowerCase() === email.toLowerCase();
+                    {((accessData?.admins && accessData.admins.length > 0)
+                      ? accessData.admins
+                      : [{ id: 'super-root', name: 'saurabh ojha', email: email || 'saurabho7222@gmail.com', role: 'admin' }]
+                    ).map((adm: any) => {
+                        const isSuper = (adm.email?.toLowerCase() === email?.toLowerCase()) || (adm.email?.toLowerCase() === 'saurabho7222@gmail.com');
                         const role = adm.role || 'admin';
                         return (
                           <div
@@ -1344,7 +1334,7 @@ export default function Admin({ email }: { email: string }) {
                                     {role === 'recruiter' ? 'Recruiter' : 'Administrator'}
                                   </span>
 
-                                  {accessData?.isSuperAdmin && (
+                                  {isSuperAdminUser && (
                                     <>
                                       <button
                                         onClick={() => handleChangeAdminRole(adm.id, role === 'admin' ? 'recruiter' : 'admin')}
@@ -1366,10 +1356,7 @@ export default function Admin({ email }: { email: string }) {
                             </div>
                           </div>
                         );
-                      })
-                    ) : (
-                      <p className="text-xs text-gray-500">No administrators registered.</p>
-                    )}
+                      })}
                   </div>
                 </div>
 
@@ -1388,20 +1375,22 @@ export default function Admin({ email }: { email: string }) {
                             <div className="text-[11px] text-gray-500">{req.email}</div>
                             <p className="text-xs text-gray-600 mt-1 italic">&quot;{req.reason}&quot;</p>
                           </div>
-                          <div className="flex items-center gap-2">
-                            <button
-                              onClick={() => handleAdminAccessAction(req.user_id, 'grant')}
-                              className="px-3 py-1.5 bg-[#182319] text-[#c4f568] rounded-xl text-xs font-bold transition"
-                            >
-                              Approve Admin
-                            </button>
-                            <button
-                              onClick={() => handleAdminAccessAction(req.user_id, 'revoke')}
-                              className="px-3 py-1.5 bg-rose-50 text-rose-700 rounded-xl text-xs font-bold transition"
-                            >
-                              Reject
-                            </button>
-                          </div>
+                          {isSuperAdminUser && (
+                            <div className="flex items-center gap-2">
+                              <button
+                                onClick={() => handleAdminAccessAction(req.user_id, 'grant')}
+                                className="px-3 py-1.5 bg-[#182319] text-[#c4f568] rounded-xl text-xs font-bold transition cursor-pointer"
+                              >
+                                Approve Admin
+                              </button>
+                              <button
+                                onClick={() => handleAdminAccessAction(req.user_id, 'revoke')}
+                                className="px-3 py-1.5 bg-rose-50 text-rose-700 rounded-xl text-xs font-bold transition cursor-pointer"
+                              >
+                                Reject
+                              </button>
+                            </div>
+                          )}
                         </div>
                       ))}
                     </div>

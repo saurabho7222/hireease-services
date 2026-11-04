@@ -207,6 +207,22 @@ export default function Home() {
     }, 1000);
   };
 
+  const getCleanExcerpt = (desc: string): string => {
+    if (!desc) return '';
+    let text = desc
+      .replace(/^Role Title:[\s\S]*?(?=Role Type:|$)/i, '')
+      .replace(/^Role Type:[\s\S]*?(?=Location:|$)/i, '')
+      .replace(/^Location:[\s\S]*?(?=(micro1|We are|In this role|About the opportunity|About micro1|$))/i, '')
+      .replace(/^(About micro1:?|micro1 is engaging:?|We are engaging:?|In this role,?\s*)/i, '')
+      .replace(/\s+/g, ' ')
+      .trim();
+    if (!text) text = desc.replace(/\s+/g, ' ').trim();
+    if (text.length > 120) {
+      return text.slice(0, 120).trim() + '…';
+    }
+    return text;
+  };
+
   const initiateApplication = async (job: Job, e?: React.MouseEvent) => {
     if (e) {
       e.stopPropagation();
@@ -884,24 +900,33 @@ export default function Home() {
             </div>
 
             {/* Meta bar */}
-            <div className="results-meta-bar">
+            <div className="results-meta-bar flex items-center justify-between flex-wrap gap-3">
               <span>
                 <strong>{visible.length}</strong> roles matching your criteria
               </span>
-              {(category !== 'All roles' || platform !== 'all' || query || filterDemand || filterUrgent) && (
-                <button
-                  onClick={() => {
-                    setCategory('All roles');
-                    setPlatform('all');
-                    setQuery('');
-                    setFilterDemand(false);
-                    setFilterUrgent(false);
-                  }}
-                  className="reset-filters-btn"
+              <div className="flex items-center gap-2">
+                <a
+                  href="/jobs"
+                  className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-[#edf7e3] hover:bg-[#c4f568] text-[#182319] hover:text-[#182319] font-bold text-xs rounded-full transition shadow-2xs border border-[#d2ebd5]"
                 >
-                  Reset all filters
-                </button>
-              )}
+                  <span>View Full Catalog ({visible.length} Roles)</span>
+                  <ArrowRight size={13} />
+                </a>
+                {(category !== 'All roles' || platform !== 'all' || query || filterDemand || filterUrgent) && (
+                  <button
+                    onClick={() => {
+                      setCategory('All roles');
+                      setPlatform('all');
+                      setQuery('');
+                      setFilterDemand(false);
+                      setFilterUrgent(false);
+                    }}
+                    className="reset-filters-btn ml-2"
+                  >
+                    Reset all filters
+                  </button>
+                )}
+              </div>
             </div>
 
             {unavailable && (
@@ -916,53 +941,60 @@ export default function Home() {
                 const isSaved = savedJobs.includes(j.id);
                 return (
                   <article key={j.id} className="stn-job-card">
-                    <div className="card-top-row">
-                      <span className="platform-tag">
-                        <span className="dot" />
-                        {j.platform || j.company}
-                      </span>
-                      <div className="card-badge-group">
-                        {j.urgent && (
-                          <span className="badge-urgent">
-                            <Zap size={11} /> Urgent
-                          </span>
-                        )}
-                        {j.highDemand && (
-                          <span className="badge-demand">
-                            <Flame size={11} /> High demand
-                          </span>
-                        )}
-                        <span className="badge-remote">Remote</span>
-                      </div>
-                    </div>
-
-                    <h3 className="job-title-heading">
-                      <button onClick={() => setDetail(j)} className="text-left hover:text-emerald-800">
-                        {j.title}
-                      </button>
-                    </h3>
-
-                    <div className="job-comp-line">
-                      <span className="comp-amount">{j.payRate || j.compensation}</span>
-                      <span className="location-meta">
-                        <MapPin size={13} /> {j.location}
-                      </span>
-                    </div>
-
-                    <p className="job-snippet">{j.description}</p>
-
-                    {/* Match reason highlight */}
-                    <div className="match-reason-box">
-                      <span className="label">Why you:</span> Matches skills in{' '}
-                      <strong>{j.skills.slice(0, 2).join(' & ')}</strong>
-                    </div>
-
-                    <div className="job-skills-row">
-                      {j.skills.slice(0, 4).map(s => (
-                        <span key={s} className="skill-chip">
-                          {s}
+                    <div>
+                      <div className="card-top-row">
+                        <span className="platform-tag">
+                          <span className="dot" />
+                          via {j.platform || j.company || 'micro1'}
                         </span>
-                      ))}
+                        <div className="card-badge-group">
+                          {j.urgent && (
+                            <span className="badge-urgent">
+                              <Zap size={11} /> Urgent
+                            </span>
+                          )}
+                          {j.highDemand && (
+                            <span className="badge-demand">
+                              <Flame size={11} /> High demand
+                            </span>
+                          )}
+                          <span className="badge-remote">Remote</span>
+                        </div>
+                      </div>
+
+                      <h3 className="job-title-heading">
+                        <button onClick={() => setDetail(j)} className="text-left hover:text-emerald-800 transition line-clamp-2">
+                          {j.title}
+                        </button>
+                      </h3>
+
+                      <div className="job-comp-line">
+                        <span className="comp-amount">{j.payRate || j.compensation}</span>
+                        <span className="location-meta">
+                          <MapPin size={12} /> {j.location || 'Remote'}
+                        </span>
+                      </div>
+
+                      <p className="job-snippet">{getCleanExcerpt(j.description)}</p>
+
+                      {/* Match reason highlight */}
+                      <div className="match-reason-box">
+                        <span className="label">Why you:</span> Matches skills in{' '}
+                        <strong>{j.skills.slice(0, 2).join(' & ')}</strong>
+                      </div>
+
+                      <div className="job-skills-row">
+                        {j.skills.slice(0, 3).map(s => (
+                          <span key={s} className="skill-chip">
+                            {s}
+                          </span>
+                        ))}
+                        {j.skills.length > 3 && (
+                          <span className="skill-chip-more">
+                            +{j.skills.length - 3}
+                          </span>
+                        )}
+                      </div>
                     </div>
 
                     <div className="card-bottom-actions">
@@ -999,24 +1031,27 @@ export default function Home() {
 
             {/* View All Jobs Prominent Callout Section */}
             {visible.length > 0 && (
-              <div className="homepage-view-all-box text-center py-8 px-6 bg-white border border-[#dce5d4] rounded-2xl shadow-xs mt-8">
-                <div className="max-w-xl mx-auto space-y-3">
+              <div className="homepage-view-all-box text-center py-10 px-6 bg-white border border-[#dce5d4] rounded-3xl shadow-xs mt-10">
+                <div className="max-w-xl mx-auto space-y-4">
                   <span className="platform-directory-eyebrow">
                     EXPLORE COMPLETE CATALOG ({visible.length} OPENINGS)
                   </span>
-                  <h3 className="text-xl sm:text-2xl font-extrabold text-[#182319]">
+                  <h3 className="text-2xl sm:text-3xl font-extrabold text-[#182319] tracking-tight">
                     Looking for More Specialist Openings?
                   </h3>
                   <p className="text-xs sm:text-sm text-gray-600 leading-relaxed">
                     Showing a curated preview of 8 roles. Access our full directory of {visible.length} AI training, annotation, and RLHF opportunities with search, pagination, category filters, and dedicated job pages.
                   </p>
-                  <div className="pt-2">
+                  <div className="pt-3">
                     <a
                       href="/jobs"
-                      className="inline-flex items-center justify-center gap-2 px-8 py-3.5 bg-[#182319] hover:bg-[#2b421e] text-[#c4f568] font-bold text-sm rounded-xl transition shadow-md hover:shadow-lg hover:-translate-y-0.5"
+                      className="btn-view-all-jobs inline-flex items-center justify-center gap-2.5 px-8 py-4 bg-[#c4f568] hover:bg-[#b5f547] text-[#142015] font-extrabold text-base rounded-2xl shadow-md hover:shadow-xl hover:-translate-y-0.5 transition-all duration-200 border-2 border-[#a8e544] cursor-pointer no-underline group"
+                      style={{ backgroundColor: '#c4f568', color: '#142015' }}
                     >
-                      <span>View All {visible.length} Jobs</span>
-                      <ArrowRight size={16} />
+                      <span className="text-[#142015] font-extrabold text-base" style={{ color: '#142015' }}>
+                        View All {visible.length} Jobs
+                      </span>
+                      <ArrowRight size={18} className="text-[#142015] stroke-[2.5] group-hover:translate-x-1 transition-transform" style={{ color: '#142015' }} />
                     </a>
                   </div>
                 </div>
