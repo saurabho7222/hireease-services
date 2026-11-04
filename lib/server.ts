@@ -1,6 +1,6 @@
 import {env} from 'cloudflare:workers';
 import {getChatGPTUser} from '@/app/chatgpt-auth';
-import {getAuthUser} from '@/lib/auth-server';
+import {getAuthUser, isSuperAdminEmail} from '@/lib/auth-server';
 import {z} from 'zod';
 export function db(){if(!env.DB)throw new Error('Database unavailable');return env.DB}
 export function bucket(){if(!env.BUCKET)throw new Error('Resume storage unavailable');return env.BUCKET}
@@ -8,18 +8,20 @@ export function json(data:unknown,status=200){return Response.json(data,{status,
 export async function user(){
   const appUser = await getAuthUser();
   if (appUser) {
+    const isSuper = isSuperAdminEmail(appUser.email);
     return {
       userId: appUser.id,
       displayName: appUser.name,
       email: appUser.email,
       fullName: appUser.name,
-      role: appUser.role
+      role: isSuper ? 'admin' : appUser.role
     };
   }
   const u=await getChatGPTUser();
   if(!u)throw new ApiError('Please sign in to continue.',401);
   const dbUser = await db().prepare('SELECT role FROM users WHERE id = ? OR email = ?').bind(u.userId, u.email).first<{ role: string }>();
-  const verifiedRole: 'admin' | 'recruiter' | 'candidate' = dbUser?.role === 'admin' ? 'admin' : (dbUser?.role === 'recruiter' ? 'recruiter' : 'candidate');
+  const isSuper = isSuperAdminEmail(u.email);
+  const verifiedRole: 'admin' | 'recruiter' | 'candidate' = isSuper ? 'admin' : (dbUser?.role === 'admin' ? 'admin' : (dbUser?.role === 'recruiter' ? 'recruiter' : 'candidate'));
   return { ...u, role: verifiedRole };
 }
 export class ApiError extends Error{constructor(message:string,public status=400){super(message)}}
@@ -27,20 +29,78 @@ export function sameOrigin(r:Request){const origin=r.headers.get('origin');const
 export async function body(r:Request){sameOrigin(r);if(!r.headers.get('content-type')?.includes('application/json'))throw new ApiError('Send a JSON request.',415);const t=await r.text();if(t.length>40000)throw new ApiError('This request is too large.',413);try{return JSON.parse(t)}catch{throw new ApiError('Invalid request.')}}
 export async function staffUser(){
   const u=await user();
-  if (u.role === 'admin' || u.role === 'recruiter') return u;
+  if (u.role === 'admin' || u.role === 'recruiter' || isSuperAdminEmail(u.email)) return u;
   const s=await db().prepare('SELECT user_id FROM staff WHERE user_id = ? OR id = ?').bind(u.userId,'owner').first<{user_id:string}>();
   if(!s)throw new ApiError('Recruiter access is required.',403);
   return u;
 }
 export async function isStaff(id:string){
-  const u = await db().prepare('SELECT role FROM users WHERE id = ?').bind(id).first<{role:string}>();
-  if (u?.role === 'admin' || u?.role === 'recruiter') return true;
+  const u = await db().prepare('SELECT email, role FROM users WHERE id = ?').bind(id).first<{email?: string; role:string}>();
+  if (u?.role === 'admin' || u?.role === 'recruiter' || (u?.email && isSuperAdminEmail(u.email))) return true;
   const s=await db().prepare('SELECT user_id FROM staff WHERE user_id = ? OR id = ?').bind(id,'owner').first<{user_id:string}>();
   return !!s;
 }
 export function fail(e:unknown){if(e instanceof ApiError)return json({error:e.message},e.status);if(e instanceof z.ZodError)return json({error:e.issues[0]?.message||'Please check the information you entered.'},400);console.error('HireEase request failed',e instanceof Error?e.message:'Storage error');return json({error:'This service is temporarily unavailable. Please try again.'},503)}
 export const profileSchema=z.object({name:z.string().trim().min(2,'Enter your full name.').max(120),address:z.string().trim().min(3,'Enter your address.').max(500),city:z.string().trim().min(2,'Enter your city.').max(120),country:z.string().trim().min(2,'Enter your country.').max(120),education:z.string().trim().min(2,'Enter your education.').max(200),institution:z.string().trim().min(2,'Enter your institution.').max(200),graduationYear:z.string().regex(/^(19|20|21)\d{2}$/,'Enter a four-digit graduation year.'),skills:z.array(z.string().trim().min(2).max(100)).min(1,'Add at least one skill.').max(30),experience:z.string().trim().min(10,'Tell us a little about your experience.').max(5000),consent:z.literal(true,{errorMap:()=>({message:'Please agree to profile processing.'})})});
-export function publicProfile(p:any){const resumeUrl=p.resume_key?(p.resume_key.startsWith('http')||p.resume_key.startsWith('/')?p.resume_key:'/'+p.resume_key):null;return{userId:p.user_id,email:p.email,name:p.name,address:p.address,city:p.city,country:p.country,education:p.education,institution:p.institution,graduationYear:p.graduation_year,skills:JSON.parse(p.skills),experience:p.experience,resumeName:p.resume_name,resumeUrl,hasResume:!!p.resume_key,updatedAt:p.updated_at}}
-export function jobRow(j:any){return{id:j.id,title:j.title,company:j.company,category:j.category,location:j.location,type:j.type,experience:j.experience,compensation:j.compensation,description:j.description,skills:JSON.parse(j.skills),responsibilities:JSON.parse(j.responsibilities),isSample:false,status:j.status,createdAt:j.created_at,externalUrl:j.external_url||j.externalUrl||null}}
+
+export function parseSafeJsonArray(val: any): string[] {
+  if (Array.isArray(val)) return val.map(String);
+  if (!val) return [];
+  if (typeof val === 'string') {
+    const trimmed = val.trim();
+    if (trimmed.startsWith('[')) {
+      try {
+        const parsed = JSON.parse(trimmed);
+        if (Array.isArray(parsed)) return parsed.map(String);
+      } catch {}
+    }
+    return trimmed.split(',').map(s => s.trim()).filter(Boolean);
+  }
+  return [];
+}
+
+export function publicProfile(p: any) {
+  if (!p) return null as any;
+  const resumeKey = p.resume_key || p.resumeKey;
+  const resumeUrl = p.resumeUrl || (resumeKey ? (resumeKey.startsWith('http') || resumeKey.startsWith('/') ? resumeKey : '/' + resumeKey) : null);
+  return {
+    userId: p.user_id || p.userId || '',
+    email: p.email || '',
+    name: p.name || 'Candidate',
+    address: p.address || '',
+    city: p.city || '',
+    country: p.country || '',
+    education: p.education || '',
+    institution: p.institution || '',
+    graduationYear: p.graduation_year || p.graduationYear || '',
+    skills: parseSafeJsonArray(p.skills),
+    experience: p.experience || '',
+    resumeName: p.resume_name || p.resumeName || '',
+    resumeUrl,
+    hasResume: !!(resumeKey || resumeUrl || p.hasResume),
+    updatedAt: p.updated_at || p.updatedAt || new Date().toISOString()
+  };
+}
+
+export function jobRow(j: any) {
+  return {
+    id: j.id,
+    title: j.title,
+    company: j.company,
+    category: j.category,
+    location: j.location,
+    type: j.type,
+    experience: j.experience,
+    compensation: j.compensation,
+    description: j.description,
+    skills: parseSafeJsonArray(j.skills),
+    responsibilities: parseSafeJsonArray(j.responsibilities),
+    isSample: false,
+    status: j.status,
+    createdAt: j.created_at || j.createdAt,
+    externalUrl: j.external_url || j.externalUrl || null
+  };
+}
+
 export const jobSchema=z.object({title:z.string().trim().min(3).max(150),company:z.string().trim().min(2).max(150),category:z.string().trim().min(2).max(100),location:z.string().trim().min(2).max(150),type:z.enum(['Contract','Full-time','Part-time','Freelance']),experience:z.string().trim().min(2).max(200),compensation:z.string().trim().min(2).max(200),description:z.string().trim().min(20).max(3000),skills:z.array(z.string().trim().min(2).max(100)).min(1).max(20),responsibilities:z.array(z.string().trim().min(5).max(500)).min(1).max(15),status:z.enum(['open','closed']).default('open')});
 export function setupKey(){return (env as unknown as {ADMIN_SETUP_KEY?:string}).ADMIN_SETUP_KEY}

@@ -11,7 +11,7 @@ export default async function Page() {
   }
 
   // Secure backend role verification
-  if (user.role !== 'admin') {
+  if (user.role !== 'admin' && user.role !== 'recruiter') {
     // Candidate attempting to access admin panel is redirected to Candidate Panel
     redirect('/dashboard');
   }

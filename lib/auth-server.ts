@@ -265,8 +265,14 @@ export async function getAuthUser(): Promise<AppUser | null> {
     if (!record) return null;
 
     // Database and super admin config are sources of truth for role
-    const isSuper = record.email.toLowerCase() === getSuperAdminEmail();
-    const finalRole: UserRole = (isSuper || record.user_role === 'admin') ? 'admin' : 'candidate';
+    const isSuper = isSuperAdminEmail(record.email);
+    const finalRole: UserRole = isSuper
+      ? 'admin'
+      : record.user_role === 'recruiter'
+      ? 'recruiter'
+      : record.user_role === 'admin'
+      ? 'admin'
+      : 'candidate';
 
     return {
       id: record.user_id,

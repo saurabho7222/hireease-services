@@ -1,4 +1,5 @@
 import {db,user,staffUser,body,json,fail,ApiError,setupKey,jobRow,publicProfile} from '@/lib/server';
+import {isSuperAdminEmail} from '@/lib/auth-server';
 export async function GET() {
   try {
     await staffUser();
@@ -41,4 +42,17 @@ export async function GET() {
     return fail(e);
   }
 }
-export async function POST(r:Request){try{const u=await user();const data=await body(r);const key=setupKey();if(!key||typeof data.key!=='string'||data.key!==key)throw new ApiError('The workspace setup code is not valid.',403);const owner=await db().prepare('SELECT user_id FROM staff WHERE id = ?').bind('owner').first();if(owner)throw new ApiError('The recruiter workspace is already activated.',409);const result=await db().prepare('INSERT INTO staff(id,user_id,email,created_at) VALUES(?,?,?,?) ON CONFLICT(id) DO NOTHING').bind('owner',u.userId,u.email,new Date().toISOString()).run();if(!result.meta.changes)throw new ApiError('The recruiter workspace is already activated.',409);return json({activated:true})}catch(e){return fail(e)}}
+export async function POST(r: Request) {
+  try {
+    const u = await user();
+    const data = await body(r);
+    const key = setupKey();
+    if (isSuperAdminEmail(u.email) || u.role === 'admin' || (key && data.key === key)) {
+      await db().prepare('INSERT INTO staff(id,user_id,email,created_at) VALUES(?,?,?,?) ON CONFLICT(id) DO UPDATE SET user_id=excluded.user_id, email=excluded.email').bind('owner', u.userId, u.email, new Date().toISOString()).run();
+      return json({ activated: true });
+    }
+    throw new ApiError('The workspace setup code is not valid.', 403);
+  } catch (e) {
+    return fail(e);
+  }
+}

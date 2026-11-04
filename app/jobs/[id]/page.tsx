@@ -41,3 +41,4 @@ export default async function JobDetailPage({ params }: { params: Promise<{ id: 
 
   return <JobDetailClient initialJob={job} />;
 }
+

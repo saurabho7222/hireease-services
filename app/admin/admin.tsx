@@ -581,6 +581,20 @@ export default function Admin({ email }: { email: string }) {
 
         {loading ? (
           <Skeleton className="h-96 w-full rounded-2xl" />
+        ) : error && !data ? (
+          <section className="bg-white border border-rose-200 rounded-2xl p-8 max-w-xl mx-auto shadow-sm text-center">
+            <AlertCircle size={40} className="text-rose-600 mx-auto mb-3" />
+            <h2 className="text-xl font-bold text-[#182319] mb-2">Unable to Load Recruiter Workspace</h2>
+            <p className="text-xs text-rose-700 mb-6 bg-rose-50 p-3 rounded-xl border border-rose-100">
+              {error}
+            </p>
+            <button
+              onClick={() => { setLoading(true); load(); }}
+              className="px-6 py-2.5 bg-[#182319] hover:bg-[#2b421e] text-[#c4f568] font-bold text-xs rounded-xl transition shadow-xs"
+            >
+              Retry Loading
+            </button>
+          </section>
         ) : !data ? (
           <section className="bg-white border border-[#dce5d4] rounded-2xl p-8 max-w-xl mx-auto shadow-sm text-center">
             <ShieldCheck size={40} className="text-[#2e5c17] mx-auto mb-4" />
@@ -604,7 +618,7 @@ export default function Admin({ email }: { email: string }) {
               <button
                 type="submit"
                 disabled={saving}
-                className="w-full py-2.5 bg-[#182319] hover:bg-[#2e5c17] text-[#c4f568] font-bold text-xs rounded-xl transition shadow-xs"
+                className="w-full py-2.5 bg-[#182319] hover:bg-[#2b421e] text-[#c4f568] font-bold text-xs rounded-xl transition shadow-xs"
               >
                 {saving ? 'Activating…' : 'Activate Workspace'}
               </button>
