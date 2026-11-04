@@ -3,9 +3,9 @@ export async function GET() {
   try {
     await staffUser();
     const [jobs, applications, profiles] = await Promise.all([
-      db().prepare('SELECT * FROM jobs ORDER BY created_at DESC LIMIT 200').all<any>(),
-      db().prepare('SELECT * FROM applications ORDER BY created_at DESC LIMIT 200').all<any>(),
-      db().prepare('SELECT * FROM profiles ORDER BY updated_at DESC LIMIT 200').all<any>()
+      db().prepare('SELECT * FROM jobs ORDER BY created_at DESC LIMIT 1000').all<any>(),
+      db().prepare('SELECT * FROM applications ORDER BY created_at DESC LIMIT 1000').all<any>(),
+      db().prepare('SELECT * FROM profiles ORDER BY updated_at DESC LIMIT 1000').all<any>()
     ]);
 
     return json({
@@ -27,6 +27,10 @@ export async function GET() {
           status: a.status,
           notes: snap.adminNotes || '',
           rating: snap.adminRating || 0,
+          statusHistory: snap.statusHistory || [],
+          interviewDate: snap.interviewDate || null,
+          externalUrl: snap.externalUrl || null,
+          platform: a.company || snap.platform || 'micro1',
           createdAt: a.created_at,
           updatedAt: a.updated_at,
           profile: publicProfile(snap)

@@ -90,6 +90,91 @@ export default function Dashboard({
   const [query, setQuery] = useState('');
   const [savedJobs, setSavedJobs] = useState<string[]>([]);
 
+  // Tracking & Redirection State
+  const [trackingModalOpen, setTrackingModalOpen] = useState(false);
+  const [trackingJob, setTrackingJob] = useState<Job | null>(null);
+  const [targetRedirectUrl, setTargetRedirectUrl] = useState('');
+  const [countdown, setCountdown] = useState(3);
+  const [isSubmittingTracking, setIsSubmittingTracking] = useState(false);
+  const countdownTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Status Reporting State
+  const [statusUpdateApp, setStatusUpdateApp] = useState<Application | null>(null);
+  const [candidateReportStatus, setCandidateReportStatus] = useState<string>('submitted');
+  const [candidateReportNote, setCandidateReportNote] = useState<string>('');
+  const [candidateInterviewDate, setCandidateInterviewDate] = useState<string>('');
+  const [isReportingStatus, setIsReportingStatus] = useState<boolean>(false);
+
+  const startTrackingCountdown = (url: string) => {
+    if (countdownTimerRef.current) clearInterval(countdownTimerRef.current);
+    let secondsLeft = 3;
+    countdownTimerRef.current = setInterval(() => {
+      secondsLeft -= 1;
+      setCountdown(secondsLeft);
+      if (secondsLeft <= 0) {
+        if (countdownTimerRef.current) clearInterval(countdownTimerRef.current);
+        window.open(url, '_blank', 'noopener,noreferrer');
+        setTrackingModalOpen(false);
+      }
+    }, 1000);
+  };
+
+  const initiateTrackingApplication = async (job: Job) => {
+    setTrackingJob(job);
+    const referralUrl = job.externalUrl || `https://refer.micro1.ai/referral/jobs?referralCode=a462a1ef-5825-41db-8422-83628df889fc`;
+    setTargetRedirectUrl(referralUrl);
+    setCountdown(3);
+    setIsSubmittingTracking(true);
+    setTrackingModalOpen(true);
+    try {
+      const res = await fetch('/api/applications/track', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ jobId: job.id, externalUrl: referralUrl })
+      });
+      const data: any = await res.json();
+      if (data.externalUrl) {
+        setTargetRedirectUrl(data.externalUrl);
+      }
+      // Refresh candidate applications
+      api('/api/applications').then((list: any) => {
+        if (list?.applications) setApplications(list.applications);
+      }).catch(() => {});
+    } catch (err) {
+      console.error('Tracking recording error:', err);
+    } finally {
+      setIsSubmittingTracking(false);
+      startTrackingCountdown(referralUrl);
+    }
+  };
+
+  const handleCandidateStatusUpdate = async () => {
+    if (!statusUpdateApp) return;
+    setIsReportingStatus(true);
+    try {
+      await api('/api/applications/status', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          applicationId: statusUpdateApp.id,
+          status: candidateReportStatus,
+          interviewDate: candidateReportStatus === 'interview_scheduled' ? candidateInterviewDate : undefined,
+          note: candidateReportNote.trim() || undefined
+        })
+      });
+      toast.success('Your application status has been recorded.');
+      setStatusUpdateApp(null);
+      setCandidateReportNote('');
+      setCandidateInterviewDate('');
+      const list: any = await api('/api/applications');
+      if (list?.applications) setApplications(list.applications);
+    } catch (e) {
+      toast.error((e as Error).message);
+    } finally {
+      setIsReportingStatus(false);
+    }
+  };
+
   // Find Jobs Filters state
   const [jobCategory, setJobCategory] = useState('All categories');
   const [jobPlatform, setJobPlatform] = useState('All platforms');
@@ -1023,61 +1108,132 @@ ${resumeEducation}
                         ) : (
                           <div className="divide-y divide-gray-100">
                             {applications.map(app => (
-                              <div key={app.id} className="py-3 flex items-center justify-between gap-4">
+                              <div key={app.id} className="py-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                                 <div>
-                                  <div className="text-sm font-bold text-gray-900">{app.jobTitle}</div>
-                                  <div className="text-xs text-gray-500">{app.company} · Applied on {new Date(app.createdAt).toLocaleDateString()}</div>
-                                </div>
-                                {(() => {
-                                  const st = app.status;
-                                  if (st === 'approved' || st === 'selected') {
-                                    return (
-                                      <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-emerald-50 text-emerald-800 border border-emerald-200">
-                                        <CheckCircle2 size={13} className="text-emerald-600" /> Approved
-                                      </span>
-                                    );
-                                  }
-                                  if (st === 'hired') {
-                                    return (
-                                      <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-[#edf7e3] text-[#182319] border border-[#c4f568]">
-                                        🎉 Hired / Offered
-                                      </span>
-                                    );
-                                  }
-                                  if (st === 'interview_done' || st === 'interview') {
-                                    return (
-                                      <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-purple-50 text-purple-800 border border-purple-200">
-                                        🎙️ Interview Done
-                                      </span>
-                                    );
-                                  }
-                                  if (st === 'interview_scheduled') {
-                                    return (
-                                      <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-indigo-50 text-indigo-800 border border-indigo-200">
-                                        📅 Interview Scheduled
-                                      </span>
-                                    );
-                                  }
-                                  if (st === 'review' || st === 'under_review') {
-                                    return (
-                                      <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-sky-50 text-sky-800 border border-sky-200">
-                                        🔍 Under Review
-                                      </span>
-                                    );
-                                  }
-                                  if (st === 'rejected' || st === 'not_selected') {
-                                    return (
-                                      <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-rose-50 text-rose-700 border border-rose-200">
-                                        Not Selected
-                                      </span>
-                                    );
-                                  }
-                                  return (
-                                    <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-amber-50 text-amber-800 border border-amber-200">
-                                      ⏳ Pending Review
+                                  <div className="flex items-center gap-2 flex-wrap">
+                                    <span className="text-sm font-bold text-gray-900">{app.jobTitle}</span>
+                                    <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-gray-100 text-gray-700">
+                                      {app.platform || app.company || 'External'}
                                     </span>
-                                  );
-                                })()}
+                                  </div>
+                                  <div className="text-xs text-gray-500 mt-0.5 flex items-center gap-2 flex-wrap">
+                                    <span>Applied {new Date(app.createdAt).toLocaleDateString()}</span>
+                                    {app.interviewDate && (
+                                      <span className="text-indigo-700 bg-indigo-50 border border-indigo-200 px-2 py-0.5 rounded-md text-[11px] font-semibold">
+                                        📅 Interview: {new Date(app.interviewDate).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' })}
+                                      </span>
+                                    )}
+                                  </div>
+                                </div>
+
+                                <div className="flex items-center gap-2 flex-wrap self-start sm:self-auto">
+                                  {(() => {
+                                    const st = app.status;
+                                    if (st === 'approved' || st === 'selected') {
+                                      return (
+                                        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-emerald-50 text-emerald-800 border border-emerald-200">
+                                          <CheckCircle2 size={13} className="text-emerald-600" /> Selected
+                                        </span>
+                                      );
+                                    }
+                                    if (st === 'hired') {
+                                      return (
+                                        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-[#edf7e3] text-[#182319] border border-[#c4f568]">
+                                          🎉 Hired / Offered
+                                        </span>
+                                      );
+                                    }
+                                    if (st === 'interview_completed' || st === 'interview_done') {
+                                      return (
+                                        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-purple-50 text-purple-800 border border-purple-200">
+                                          🎙️ Interview Completed
+                                        </span>
+                                      );
+                                    }
+                                    if (st === 'interview_scheduled' || st === 'interview') {
+                                      return (
+                                        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-indigo-50 text-indigo-800 border border-indigo-200">
+                                          📅 Interview Scheduled
+                                        </span>
+                                      );
+                                    }
+                                    if (st === 'assessment') {
+                                      return (
+                                        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-violet-50 text-violet-800 border border-violet-200">
+                                          🧠 Assessment Stage
+                                        </span>
+                                      );
+                                    }
+                                    if (st === 'submitted') {
+                                      return (
+                                        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-teal-50 text-teal-800 border border-teal-200">
+                                          📝 Submitted
+                                        </span>
+                                      );
+                                    }
+                                    if (st === 'awaiting_confirmation') {
+                                      return (
+                                        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-yellow-50 text-yellow-800 border border-yellow-200">
+                                          ⏳ Awaiting Confirmation
+                                        </span>
+                                      );
+                                    }
+                                    if (st === 'redirected') {
+                                      return (
+                                        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-cyan-50 text-cyan-800 border border-cyan-200">
+                                          ↗️ Redirected
+                                        </span>
+                                      );
+                                    }
+                                    if (st === 'clicked_apply') {
+                                      return (
+                                        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-blue-50 text-blue-800 border border-blue-200">
+                                          🔗 Clicked Apply
+                                        </span>
+                                      );
+                                    }
+                                    if (st === 'rejected' || st === 'not_selected') {
+                                      return (
+                                        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-rose-50 text-rose-700 border border-rose-200">
+                                          ✕ Not Selected
+                                        </span>
+                                      );
+                                    }
+                                    return (
+                                      <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-amber-50 text-amber-800 border border-amber-200">
+                                        ⏳ In Review
+                                      </span>
+                                    );
+                                  })()}
+
+                                  <button
+                                    onClick={() => {
+                                      setStatusUpdateApp(app);
+                                      setCandidateReportStatus(
+                                        app.status === 'clicked_apply' || app.status === 'redirected'
+                                          ? 'submitted'
+                                          : app.status
+                                      );
+                                      setCandidateInterviewDate(app.interviewDate || '');
+                                      setCandidateReportNote('');
+                                    }}
+                                    className="text-xs px-2.5 py-1 bg-gray-100 hover:bg-gray-200 text-gray-800 rounded-lg font-semibold transition"
+                                  >
+                                    Report Progress
+                                  </button>
+
+                                  {app.externalUrl && (
+                                    <a
+                                      href={app.externalUrl}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="text-xs p-1.5 text-gray-400 hover:text-gray-700 transition"
+                                      title="Open official platform application"
+                                    >
+                                      <ExternalLink size={14} />
+                                    </a>
+                                  )}
+                                </div>
                               </div>
                             ))}
                           </div>
@@ -1483,23 +1639,12 @@ ${resumeEducation}
                               >
                                 Details
                               </button>
-                              {j.externalUrl ? (
-                                <a
-                                  href={j.externalUrl}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className="px-4 py-2 bg-[#182319] hover:bg-[#2b421e] text-[#c4f568] text-xs font-bold rounded-lg transition shadow-sm inline-flex items-center gap-1.5"
-                                >
-                                  Apply Now <ExternalLink size={13} />
-                                </a>
-                              ) : (
-                                <button
-                                  onClick={() => setSelected(j)}
-                                  className="px-4 py-2 bg-[#182319] hover:bg-[#2b421e] text-white text-xs font-bold rounded-lg transition shadow-sm"
-                                >
-                                  Apply Now
-                                </button>
-                              )}
+                              <button
+                                onClick={() => initiateTrackingApplication(j)}
+                                className="px-4 py-2 bg-[#182319] hover:bg-[#2b421e] text-[#c4f568] text-xs font-bold rounded-lg transition shadow-sm inline-flex items-center gap-1.5"
+                              >
+                                Apply Now <ExternalLink size={13} />
+                              </button>
                             </div>
                           </div>
                         </div>
@@ -2431,24 +2576,16 @@ ${resumeEducation}
                 >
                   Close
                 </button>
-                {selected.externalUrl ? (
-                  <a
-                    href={selected.externalUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex-1 py-2.5 bg-[#182319] hover:bg-[#2b421e] text-[#c4f568] text-xs font-bold rounded-xl transition shadow-sm text-center inline-flex items-center justify-center gap-1.5"
-                  >
-                    Apply on Micro1 (Referral Link) <ExternalLink size={13} />
-                  </a>
-                ) : (
-                  <button
-                    onClick={apply}
-                    disabled={saving}
-                    className="flex-1 py-2.5 bg-[#182319] hover:bg-[#2b421e] text-[#c4f568] text-xs font-bold rounded-xl transition shadow-sm"
-                  >
-                    {saving ? 'Submitting...' : 'Confirm Application'}
-                  </button>
-                )}
+                <button
+                  onClick={() => {
+                    const target = selected;
+                    setSelected(null);
+                    initiateTrackingApplication(target);
+                  }}
+                  className="flex-1 py-2.5 bg-[#182319] hover:bg-[#2b421e] text-[#c4f568] text-xs font-bold rounded-xl transition shadow-sm text-center inline-flex items-center justify-center gap-1.5"
+                >
+                  Apply Now (Official Referral) <ExternalLink size={13} />
+                </button>
               </div>
             </div>
           )}
@@ -2513,6 +2650,139 @@ ${resumeEducation}
               </div>
             </div>
           </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Application Tracking & Redirection Modal */}
+      <Dialog open={trackingModalOpen} onOpenChange={setTrackingModalOpen}>
+        <DialogContent className="max-w-md bg-white rounded-3xl p-6 sm:p-8">
+          <div className="text-center space-y-4">
+            <div className="w-14 h-14 rounded-2xl bg-[#edf7e3] text-[#2e5c17] flex items-center justify-center mx-auto border border-[#dce5d4]">
+              <CheckCircle2 size={32} />
+            </div>
+
+            <div>
+              <DialogTitle className="text-xl font-extrabold text-[#182319]">
+                Application Recorded
+              </DialogTitle>
+              <DialogDescription className="text-xs text-gray-500 mt-1">
+                {trackingJob?.title} · {trackingJob?.company || 'Partner'}
+              </DialogDescription>
+            </div>
+
+            <div className="bg-[#f7faf3] border border-[#dce5d4] p-4 rounded-2xl text-left space-y-2">
+              <p className="text-xs font-semibold text-gray-800 leading-relaxed">
+                Your application has been recorded on HireEase Services. You will now be redirected to the official job application page.
+              </p>
+              <div className="text-[11px] text-gray-500 flex items-center gap-1.5">
+                <ShieldCheck size={13} className="text-[#2e5c17]" />
+                <span>Referral tracking code verified & preserved.</span>
+              </div>
+            </div>
+
+            <div className="space-y-2 pt-2">
+              <div className="flex items-center justify-between text-xs text-gray-500">
+                <span>Redirecting to official portal...</span>
+                <span className="font-bold text-[#2e5c17]">{countdown}s</span>
+              </div>
+              <Progress value={((3 - countdown) / 3) * 100} className="h-1.5" />
+            </div>
+
+            <div className="pt-2 flex items-center justify-center gap-3">
+              <button
+                type="button"
+                onClick={() => setTrackingModalOpen(false)}
+                className="px-4 py-2 border border-gray-200 hover:bg-gray-50 text-gray-700 text-xs font-bold rounded-xl transition"
+              >
+                Cancel
+              </button>
+              <a
+                href={targetRedirectUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={() => setTrackingModalOpen(false)}
+                className="px-5 py-2 bg-[#182319] hover:bg-[#2b421e] text-[#c4f568] text-xs font-bold rounded-xl transition shadow-xs inline-flex items-center gap-1.5"
+              >
+                Redirect Now <ExternalLink size={13} />
+              </a>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Candidate Status Reporting Dialog */}
+      <Dialog open={!!statusUpdateApp} onOpenChange={o => !o && setStatusUpdateApp(null)}>
+        <DialogContent className="max-w-md bg-white rounded-3xl p-6 sm:p-8">
+          {statusUpdateApp && (
+            <div>
+              <DialogTitle className="text-lg font-bold text-gray-900 mb-1">
+                Report Application Stage
+              </DialogTitle>
+              <DialogDescription className="text-xs text-gray-500 mb-4">
+                Update your progress for <strong>{statusUpdateApp.jobTitle}</strong>. Your status will reflect directly on your candidate dashboard and recruiter ATS.
+              </DialogDescription>
+
+              <div className="space-y-4 text-xs">
+                <div>
+                  <label className="font-bold text-gray-700 block mb-1">Current Milestone Stage</label>
+                  <select
+                    value={candidateReportStatus}
+                    onChange={e => setCandidateReportStatus(e.target.value)}
+                    className="w-full p-2.5 bg-gray-50 border border-gray-200 rounded-xl text-xs text-gray-800 font-semibold focus:outline-none focus:ring-2 focus:ring-[#2e5c17]"
+                  >
+                    <option value="submitted">📝 Application Submitted on External Platform</option>
+                    <option value="assessment">🧠 Assessment / Coding Test Stage</option>
+                    <option value="interview_scheduled">📅 Interview Scheduled</option>
+                    <option value="interview_completed">🎙️ Interview Completed</option>
+                    <option value="awaiting_confirmation">⏳ Awaiting External Confirmation</option>
+                  </select>
+                </div>
+
+                {candidateReportStatus === 'interview_scheduled' && (
+                  <div>
+                    <label className="font-bold text-gray-700 block mb-1">Interview Date & Time</label>
+                    <input
+                      type="datetime-local"
+                      value={candidateInterviewDate}
+                      onChange={e => setCandidateInterviewDate(e.target.value)}
+                      className="w-full p-2.5 bg-gray-50 border border-gray-200 rounded-xl text-xs text-gray-800 focus:outline-none focus:ring-2 focus:ring-[#2e5c17]"
+                    />
+                  </div>
+                )}
+
+                <div>
+                  <label className="font-bold text-gray-700 block mb-1">
+                    Notes / Confirmation Details <span className="text-gray-400 font-normal">(optional)</span>
+                  </label>
+                  <textarea
+                    rows={2}
+                    placeholder="e.g. Submitted resume on Micro1 portal, confirmation ID received."
+                    value={candidateReportNote}
+                    onChange={e => setCandidateReportNote(e.target.value)}
+                    className="w-full p-2.5 bg-gray-50 border border-gray-200 rounded-xl text-xs text-gray-800 focus:outline-none focus:ring-2 focus:ring-[#2e5c17]"
+                  />
+                </div>
+
+                <div className="pt-2 flex items-center justify-end gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setStatusUpdateApp(null)}
+                    className="px-4 py-2 border border-gray-200 hover:bg-gray-50 text-gray-700 text-xs font-bold rounded-xl transition"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    disabled={isReportingStatus}
+                    onClick={handleCandidateStatusUpdate}
+                    className="px-5 py-2 bg-[#182319] hover:bg-[#2b421e] text-[#c4f568] text-xs font-bold rounded-xl transition shadow-xs"
+                  >
+                    {isReportingStatus ? 'Saving...' : 'Save Progress'}
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
         </DialogContent>
       </Dialog>
     </div>

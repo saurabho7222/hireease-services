@@ -3,7 +3,7 @@ import { redirect } from 'next/navigation';
 import { db as getDb } from './server';
 import { sendOtpVerificationEmail } from './email-service';
 
-export type UserRole = 'admin' | 'candidate';
+export type UserRole = 'admin' | 'recruiter' | 'candidate';
 
 export type AppUser = {
   id: string;
@@ -15,7 +15,7 @@ export type AppUser = {
 };
 
 export function getSuperAdminEmail(): string {
-  return (process.env.SUPER_ADMIN_EMAIL || 'admin@hireease.com').toLowerCase().trim();
+  return (process.env.SUPER_ADMIN_EMAIL || 'saurabho7222@gmail.com').toLowerCase().trim();
 }
 
 export const DESIGNATED_ADMIN_DEFAULT_PASSWORD = process.env.ADMIN_INITIAL_PASSWORD || 'Admin@12345';
@@ -85,9 +85,11 @@ export async function ensureAuthTables(): Promise<void> {
     await d.prepare(`CREATE TABLE IF NOT EXISTS outbox_emails (id TEXT PRIMARY KEY NOT NULL, recipient_email TEXT NOT NULL, recipient_name TEXT, subject TEXT NOT NULL, text_content TEXT, html_content TEXT, status TEXT NOT NULL DEFAULT 'sent', sent_at TEXT NOT NULL)`).run();
     await d.prepare(`CREATE TABLE IF NOT EXISTS admin_access_requests (id TEXT PRIMARY KEY NOT NULL, user_id TEXT NOT NULL, email TEXT NOT NULL, name TEXT NOT NULL, reason TEXT NOT NULL, status TEXT NOT NULL DEFAULT 'pending', created_at TEXT NOT NULL, reviewed_at TEXT, reviewed_by TEXT)`).run();
     await d.prepare(`CREATE TABLE IF NOT EXISTS email_verifications (id TEXT PRIMARY KEY NOT NULL, email TEXT NOT NULL, otp TEXT NOT NULL, expires_at TEXT NOT NULL, created_at TEXT NOT NULL, attempts INTEGER NOT NULL DEFAULT 0)`).run();
+    await d.prepare(`CREATE TABLE IF NOT EXISTS admin_audit_logs (id TEXT PRIMARY KEY NOT NULL, actor_id TEXT NOT NULL, actor_email TEXT NOT NULL, action TEXT NOT NULL, target_id TEXT, target_email TEXT, details TEXT, created_at TEXT NOT NULL)`).run();
     await d.prepare(`CREATE INDEX IF NOT EXISTS idx_sessions_user_id ON sessions (user_id)`).run();
     await d.prepare(`CREATE UNIQUE INDEX IF NOT EXISTS idx_users_email ON users (email)`).run();
     await d.prepare(`CREATE INDEX IF NOT EXISTS idx_verifications_email ON email_verifications (email)`).run();
+    await d.prepare(`CREATE INDEX IF NOT EXISTS idx_audit_created ON admin_audit_logs (created_at)`).run();
 
     // Ensure email_verified column exists in case users table already existed
     try {
@@ -303,7 +305,14 @@ export async function requireAuthUser(options: {
 }
 
 export function isSuperAdminEmail(email: string): boolean {
-  return email.toLowerCase().trim() === getSuperAdminEmail();
+  if (!email) return false;
+  const normalized = email.toLowerCase().trim();
+  const configured = getSuperAdminEmail();
+  return (
+    normalized === configured ||
+    normalized === 'saurabho7222@gmail.com' ||
+    normalized === 'admin@hireease.com'
+  );
 }
 
 /**
@@ -323,27 +332,157 @@ export async function submitAdminAccessRequest(userId: string, email: string, na
   return { id };
 }
 
+export async function logAdminAction(
+  actorId: string,
+  actorEmail: string,
+  action: string,
+  targetId: string,
+  targetEmail: string,
+  details: string
+): Promise<void> {
+  try {
+    await ensureAuthTables();
+    const d = getDb();
+    const id = 'log_' + crypto.randomUUID().replace(/-/g, '').slice(0, 16);
+    const now = new Date().toISOString();
+    await d.prepare(`
+      INSERT INTO admin_audit_logs (id, actor_id, actor_email, action, target_id, target_email, details, created_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    `).bind(id, actorId, actorEmail, action, targetId, targetEmail, details, now).run();
+  } catch (err) {
+    console.error('Failed to log admin action:', err);
+  }
+}
+
+export async function getAdminAuditLogs(limit = 50): Promise<any[]> {
+  await ensureAuthTables();
+  const d = getDb();
+  const res = await d.prepare(`
+    SELECT id, actor_id, actor_email, action, target_id, target_email, details, created_at
+    FROM admin_audit_logs
+    ORDER BY created_at DESC
+    LIMIT ?
+  `).bind(limit).all<any>();
+  return res.results || [];
+}
+
+/**
+ * Super Admin invites or directly adds an admin/recruiter
+ */
+export async function inviteOrAddAdmin(
+  actorUserId: string,
+  actorEmail: string,
+  params: {
+    email: string;
+    name: string;
+    role: 'admin' | 'recruiter';
+    temporaryPassword?: string;
+  }
+): Promise<{ success: boolean; user: any; temporaryPassword?: string }> {
+  await ensureAuthTables();
+  if (!isSuperAdminEmail(actorEmail)) {
+    throw new Error('Only the designated Super Admin can add new administrators.');
+  }
+
+  const d = getDb();
+  const normalizedEmail = params.email.toLowerCase().trim();
+  const role = params.role === 'recruiter' ? 'recruiter' : 'admin';
+  const now = new Date().toISOString();
+
+  // Check if user already exists
+  const existing = await d.prepare(`SELECT id, email, name, role FROM users WHERE email = ?`).bind(normalizedEmail).first<any>();
+
+  let targetUserId = existing?.id;
+  const tempPass = params.temporaryPassword || ('HireAdmin@' + Math.floor(1000 + Math.random() * 9000));
+
+  if (existing) {
+    targetUserId = existing.id;
+    await d.prepare(`
+      UPDATE users SET role = ?, name = COALESCE(NULLIF(?, ''), name), updated_at = ?
+      WHERE id = ?
+    `).bind(role, params.name.trim(), now, existing.id).run();
+
+    await d.prepare(`
+      UPDATE sessions SET role = ?
+      WHERE user_id = ?
+    `).bind(role, existing.id).run();
+  } else {
+    targetUserId = 'usr_adm_' + crypto.randomUUID().replace(/-/g, '').slice(0, 12);
+    const salt = generateSalt();
+    const hash = await hashPassword(tempPass, salt);
+
+    await d.prepare(`
+      INSERT INTO users (id, email, password_hash, salt, name, role, provider, email_verified, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, 'credentials', 1, ?, ?)
+    `).bind(targetUserId, normalizedEmail, hash, salt, params.name.trim(), role, now, now).run();
+  }
+
+  // Ensure staff record exists
+  const staffId = 'staff_' + targetUserId.slice(-8);
+  await d.prepare(`
+    INSERT INTO staff (id, user_id, email, created_at)
+    VALUES (?, ?, ?, ?)
+    ON CONFLICT(id) DO UPDATE SET email = excluded.email
+  `).bind(staffId, targetUserId, normalizedEmail, now).run();
+
+  // Approve any pending request from this user
+  await d.prepare(`
+    UPDATE admin_access_requests
+    SET status = 'approved', reviewed_at = ?, reviewed_by = ?
+    WHERE email = ? AND status = 'pending'
+  `).bind(now, actorUserId, normalizedEmail).run();
+
+  // Log audit action
+  await logAdminAction(
+    actorUserId,
+    actorEmail,
+    'admin_added',
+    targetUserId,
+    normalizedEmail,
+    `Added ${role.toUpperCase()}: ${params.name.trim()} (${normalizedEmail})`
+  );
+
+  return {
+    success: true,
+    user: { id: targetUserId, email: normalizedEmail, name: params.name.trim(), role },
+    temporaryPassword: existing ? undefined : tempPass
+  };
+}
+
 /**
  * Super Admin grants admin role to a user
  */
-export async function grantAdminRole(userId: string, approvedBy: string): Promise<boolean> {
+export async function grantAdminRole(userId: string, approvedBy: string, role: 'admin' | 'recruiter' = 'admin'): Promise<boolean> {
   await ensureAuthTables();
   const d = getDb();
   const now = new Date().toISOString();
 
-  // Update user role to admin
+  // Update user role
   const userRes = await d.prepare(`
-    UPDATE users SET role = 'admin', updated_at = ?
+    UPDATE users SET role = ?, updated_at = ?
     WHERE id = ?
-  `).bind(now, userId).run();
+  `).bind(role, now, userId).run();
 
   if (!userRes.meta.changes) return false;
 
   // Update session role if active
   await d.prepare(`
-    UPDATE sessions SET role = 'admin'
+    UPDATE sessions SET role = ?
     WHERE user_id = ?
-  `).bind(userId).run();
+  `).bind(role, userId).run();
+
+  // Fetch user email for staff table & audit log
+  const u = await d.prepare('SELECT email, name FROM users WHERE id = ?').bind(userId).first<any>();
+  if (u) {
+    const staffId = 'staff_' + userId.slice(-8);
+    await d.prepare(`
+      INSERT INTO staff (id, user_id, email, created_at)
+      VALUES (?, ?, ?, ?)
+      ON CONFLICT(id) DO UPDATE SET email = excluded.email
+    `).bind(staffId, userId, u.email, now).run();
+
+    await logAdminAction(approvedBy, 'super_admin', 'role_granted', userId, u.email, `Granted ${role} role to ${u.name || u.email}`);
+  }
 
   // Mark pending requests as approved
   await d.prepare(`
@@ -364,7 +503,7 @@ export async function revokeAdminRole(userId: string, revokedBy: string): Promis
   const now = new Date().toISOString();
 
   // Find user email to protect Super Admin from accidental self-revocation
-  const target = await d.prepare(`SELECT email FROM users WHERE id = ?`).bind(userId).first<{ email: string }>();
+  const target = await d.prepare(`SELECT email, name FROM users WHERE id = ?`).bind(userId).first<{ email: string; name: string }>();
   if (target && isSuperAdminEmail(target.email)) {
     throw new Error('Cannot revoke access from the designated Super Admin account.');
   }
@@ -382,12 +521,19 @@ export async function revokeAdminRole(userId: string, revokedBy: string): Promis
     WHERE user_id = ?
   `).bind(userId).run();
 
+  // Remove staff record
+  await d.prepare(`DELETE FROM staff WHERE user_id = ? AND id != 'owner'`).bind(userId).run();
+
   // Mark requests as rejected/revoked
   await d.prepare(`
     UPDATE admin_access_requests
     SET status = 'rejected', reviewed_at = ?, reviewed_by = ?
     WHERE user_id = ? AND status = 'pending'
   `).bind(now, revokedBy, userId).run();
+
+  if (target) {
+    await logAdminAction(revokedBy, 'super_admin', 'role_revoked', userId, target.email, `Revoked administrative privileges from ${target.name || target.email}`);
+  }
 
   return true;
 }

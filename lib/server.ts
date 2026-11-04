@@ -19,7 +19,7 @@ export async function user(){
   const u=await getChatGPTUser();
   if(!u)throw new ApiError('Please sign in to continue.',401);
   const dbUser = await db().prepare('SELECT role FROM users WHERE id = ? OR email = ?').bind(u.userId, u.email).first<{ role: string }>();
-  const verifiedRole: 'admin' | 'candidate' = dbUser?.role === 'admin' ? 'admin' : 'candidate';
+  const verifiedRole: 'admin' | 'recruiter' | 'candidate' = dbUser?.role === 'admin' ? 'admin' : (dbUser?.role === 'recruiter' ? 'recruiter' : 'candidate');
   return { ...u, role: verifiedRole };
 }
 export class ApiError extends Error{constructor(message:string,public status=400){super(message)}}
@@ -27,16 +27,16 @@ export function sameOrigin(r:Request){const origin=r.headers.get('origin');const
 export async function body(r:Request){sameOrigin(r);if(!r.headers.get('content-type')?.includes('application/json'))throw new ApiError('Send a JSON request.',415);const t=await r.text();if(t.length>40000)throw new ApiError('This request is too large.',413);try{return JSON.parse(t)}catch{throw new ApiError('Invalid request.')}}
 export async function staffUser(){
   const u=await user();
-  if (u.role === 'admin') return u;
-  const s=await db().prepare('SELECT user_id FROM staff WHERE id = ?').bind('owner').first<{user_id:string}>();
-  if(!s||s.user_id!==u.userId)throw new ApiError('Recruiter access is required.',403);
+  if (u.role === 'admin' || u.role === 'recruiter') return u;
+  const s=await db().prepare('SELECT user_id FROM staff WHERE user_id = ? OR id = ?').bind(u.userId,'owner').first<{user_id:string}>();
+  if(!s)throw new ApiError('Recruiter access is required.',403);
   return u;
 }
 export async function isStaff(id:string){
   const u = await db().prepare('SELECT role FROM users WHERE id = ?').bind(id).first<{role:string}>();
-  if (u?.role === 'admin') return true;
-  const s=await db().prepare('SELECT user_id FROM staff WHERE id = ?').bind('owner').first<{user_id:string}>();
-  return s?.user_id===id;
+  if (u?.role === 'admin' || u?.role === 'recruiter') return true;
+  const s=await db().prepare('SELECT user_id FROM staff WHERE user_id = ? OR id = ?').bind(id,'owner').first<{user_id:string}>();
+  return !!s;
 }
 export function fail(e:unknown){if(e instanceof ApiError)return json({error:e.message},e.status);if(e instanceof z.ZodError)return json({error:e.issues[0]?.message||'Please check the information you entered.'},400);console.error('HireEase request failed',e instanceof Error?e.message:'Storage error');return json({error:'This service is temporarily unavailable. Please try again.'},503)}
 export const profileSchema=z.object({name:z.string().trim().min(2,'Enter your full name.').max(120),address:z.string().trim().min(3,'Enter your address.').max(500),city:z.string().trim().min(2,'Enter your city.').max(120),country:z.string().trim().min(2,'Enter your country.').max(120),education:z.string().trim().min(2,'Enter your education.').max(200),institution:z.string().trim().min(2,'Enter your institution.').max(200),graduationYear:z.string().regex(/^(19|20|21)\d{2}$/,'Enter a four-digit graduation year.'),skills:z.array(z.string().trim().min(2).max(100)).min(1,'Add at least one skill.').max(30),experience:z.string().trim().min(10,'Tell us a little about your experience.').max(5000),consent:z.literal(true,{errorMap:()=>({message:'Please agree to profile processing.'})})});

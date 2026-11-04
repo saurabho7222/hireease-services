@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState, useMemo, useRef } from 'react';
 import {
   Sparkles,
   Search,
@@ -31,7 +31,7 @@ import {
   Globe,
   Pause,
   Play,
-  FileSpreadsheet
+  ExternalLink
 } from 'lucide-react';
 import { Sheet, SheetContent, SheetTitle, SheetDescription } from '@/components/ui/sheet';
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from '@/components/ui/dialog';
@@ -166,6 +166,115 @@ export default function Home() {
       return matchCategory && matchPlatform && matchQuery && matchDemand && matchUrgent;
     });
   }, [jobs, query, category, platform, filterDemand, filterUrgent]);
+
+  // Featured 8 roles for homepage to prevent overly lengthy pages
+  const featuredPreview = useMemo(() => {
+    return visible.slice(0, 8);
+  }, [visible]);
+
+  // Candidate Application Tracking & Redirection State
+  const [trackingModalOpen, setTrackingModalOpen] = useState(false);
+  const [selectedJobForApply, setSelectedJobForApply] = useState<Job | null>(null);
+  const [countdown, setCountdown] = useState(3);
+  const [isSubmittingTracking, setIsSubmittingTracking] = useState(false);
+  const [targetRedirectUrl, setTargetRedirectUrl] = useState('');
+  const [currentUser, setCurrentUser] = useState<{ id: string; email: string; name: string } | null>(null);
+  const [guestEmail, setGuestEmail] = useState('');
+  const [guestName, setGuestName] = useState('');
+  const [showGuestForm, setShowGuestForm] = useState(false);
+  const countdownTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+  useEffect(() => {
+    fetch('/api/auth/me')
+      .then(r => (r.ok ? r.json() : null))
+      .then((d: any) => {
+        if (d?.user) setCurrentUser(d.user);
+      })
+      .catch(() => {});
+  }, []);
+
+  const startCountdown = (url: string) => {
+    if (countdownTimerRef.current) clearInterval(countdownTimerRef.current);
+    let secondsLeft = 3;
+    countdownTimerRef.current = setInterval(() => {
+      secondsLeft -= 1;
+      setCountdown(secondsLeft);
+      if (secondsLeft <= 0) {
+        if (countdownTimerRef.current) clearInterval(countdownTimerRef.current);
+        window.open(url, '_blank', 'noopener,noreferrer');
+        setTrackingModalOpen(false);
+      }
+    }, 1000);
+  };
+
+  const initiateApplication = async (job: Job, e?: React.MouseEvent) => {
+    if (e) {
+      e.stopPropagation();
+      e.preventDefault();
+    }
+    setSelectedJobForApply(job);
+    const referralUrl = job.externalUrl || `https://refer.micro1.ai/referral/jobs?referralCode=a462a1ef-5825-41db-8422-83628df889fc`;
+    setTargetRedirectUrl(referralUrl);
+    setCountdown(3);
+
+    if (currentUser) {
+      setIsSubmittingTracking(true);
+      setTrackingModalOpen(true);
+      try {
+        const res = await fetch('/api/applications/track', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ jobId: job.id, externalUrl: referralUrl })
+        });
+        const data: any = await res.json();
+        if (data.externalUrl) {
+          setTargetRedirectUrl(data.externalUrl);
+        }
+      } catch (err) {
+        console.error('Tracking error:', err);
+      } finally {
+        setIsSubmittingTracking(false);
+        startCountdown(referralUrl);
+      }
+    } else {
+      setTrackingModalOpen(true);
+    }
+  };
+
+  const handleGuestSubmitAndRedirect = async () => {
+    if (!guestEmail.trim()) {
+      toast.error('Please enter your email to track your application.');
+      return;
+    }
+    setIsSubmittingTracking(true);
+    try {
+      const res = await fetch('/api/applications/track', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          jobId: selectedJobForApply?.id,
+          externalUrl: targetRedirectUrl,
+          guestEmail: guestEmail.trim(),
+          guestName: guestName.trim()
+        })
+      });
+      const data: any = await res.json();
+      const finalUrl = data.externalUrl || targetRedirectUrl;
+      setTargetRedirectUrl(finalUrl);
+      toast.success('Application recorded on HireEase Services!');
+      startCountdown(finalUrl);
+    } catch {
+      startCountdown(targetRedirectUrl);
+    } finally {
+      setIsSubmittingTracking(false);
+    }
+  };
+
+  const handleDirectRedirectNow = () => {
+    if (countdownTimerRef.current) clearInterval(countdownTimerRef.current);
+    window.open(targetRedirectUrl, '_blank', 'noopener,noreferrer');
+    setTrackingModalOpen(false);
+  };
 
   const toggleSaveJob = (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
@@ -694,12 +803,10 @@ export default function Home() {
               </div>
               <div className="flex items-center gap-3 flex-wrap">
                 <a
-                  href="/micro1-referral-jobs.xlsx"
-                  download="micro1-referral-jobs.xlsx"
-                  className="btn outline-green text-xs font-semibold flex items-center gap-2"
-                  title="Download all 388+ extracted jobs as an Excel (.xlsx) file"
+                  href="/jobs"
+                  className="btn green text-xs font-semibold flex items-center gap-2 shadow-xs"
                 >
-                  <FileSpreadsheet size={15} /> Export Excel (.xlsx)
+                  <Briefcase size={15} /> View All {jobs.length > 0 ? `${jobs.length} ` : ''}Roles
                 </a>
                 <button
                   onClick={() => setAlertModalOpen(true)}
@@ -707,7 +814,7 @@ export default function Home() {
                 >
                   <Bell size={15} /> Set job alert
                 </button>
-                <a href="/dashboard" className="btn green text-xs font-semibold flex items-center gap-2">
+                <a href="/dashboard" className="btn outline-green text-xs font-semibold flex items-center gap-2">
                   <Sparkles size={15} /> Match your skills
                 </a>
               </div>
@@ -803,9 +910,9 @@ export default function Home() {
               </p>
             )}
 
-            {/* Job Grid */}
+            {/* Job Grid - Displaying Curated 6-9 Roles Preview */}
             <div className="jobs-cards-grid">
-              {visible.map(j => {
+              {featuredPreview.map(j => {
                 const isSaved = savedJobs.includes(j.id);
                 return (
                   <article key={j.id} className="stn-job-card">
@@ -877,20 +984,44 @@ export default function Home() {
                         >
                           <Bookmark size={15} />
                         </button>
-                        <a
-                          href={j.externalUrl || `/dashboard?role=${encodeURIComponent(j.id)}`}
-                          target={j.externalUrl ? "_blank" : undefined}
-                          rel={j.externalUrl ? "noopener noreferrer" : undefined}
+                        <button
+                          onClick={e => initiateApplication(j, e)}
                           className="btn-apply-primary"
                         >
                           Apply now
-                        </a>
+                        </button>
                       </div>
                     </div>
                   </article>
                 );
               })}
             </div>
+
+            {/* View All Jobs Prominent Callout Section */}
+            {visible.length > 0 && (
+              <div className="homepage-view-all-box text-center py-8 px-6 bg-white border border-[#dce5d4] rounded-2xl shadow-xs mt-8">
+                <div className="max-w-xl mx-auto space-y-3">
+                  <span className="platform-directory-eyebrow">
+                    EXPLORE COMPLETE CATALOG ({visible.length} OPENINGS)
+                  </span>
+                  <h3 className="text-xl sm:text-2xl font-extrabold text-[#182319]">
+                    Looking for More Specialist Openings?
+                  </h3>
+                  <p className="text-xs sm:text-sm text-gray-600 leading-relaxed">
+                    Showing a curated preview of 8 roles. Access our full directory of {visible.length} AI training, annotation, and RLHF opportunities with search, pagination, category filters, and dedicated job pages.
+                  </p>
+                  <div className="pt-2">
+                    <a
+                      href="/jobs"
+                      className="inline-flex items-center justify-center gap-2 px-8 py-3.5 bg-[#182319] hover:bg-[#2b421e] text-[#c4f568] font-bold text-sm rounded-xl transition shadow-md hover:shadow-lg hover:-translate-y-0.5"
+                    >
+                      <span>View All {visible.length} Jobs</span>
+                      <ArrowRight size={16} />
+                    </a>
+                  </div>
+                </div>
+              </div>
+            )}
 
             {jobs.length === 0 ? (
               <div className="clean-feed-box">
@@ -1715,14 +1846,19 @@ export default function Home() {
                     <p className="text-sm text-gray-700">{detail.experience}</p>
                   </div>
 
-                  <div className="sheet-action-row">
-                    <a
-                      className="btn green w-full font-bold py-3 text-center"
-                      href={detail.externalUrl || `/dashboard?role=${encodeURIComponent(detail.id)}`}
-                      target={detail.externalUrl ? "_blank" : undefined}
-                      rel={detail.externalUrl ? "noopener noreferrer" : undefined}
+                  <div className="sheet-action-row space-y-2">
+                    <button
+                      className="btn green w-full font-bold py-3 text-center flex items-center justify-center gap-2"
+                      onClick={() => initiateApplication(detail)}
                     >
-                      {detail.externalUrl ? `Apply on ${detail.company || 'Micro1'} (Referral)` : 'Apply with HireEase Profile'}
+                      <span>Apply on {detail.company || 'Micro1'} (Referral)</span>
+                      <ExternalLink size={15} />
+                    </button>
+                    <a
+                      href={`/jobs/${detail.id}`}
+                      className="btn outline-green w-full font-bold py-2.5 text-center text-xs block"
+                    >
+                      View Dedicated Job Details Page →
                     </a>
                   </div>
                 </>
@@ -1786,6 +1922,109 @@ export default function Home() {
                     Subscribe to alerts
                   </button>
                 </form>
+              )}
+            </DialogContent>
+          </Dialog>
+
+          {/* Candidate Tracking & Redirection Modal */}
+          <Dialog open={trackingModalOpen} onOpenChange={open => !open && setTrackingModalOpen(false)}>
+            <DialogContent className="max-w-md p-6 bg-white rounded-2xl shadow-xl">
+              {selectedJobForApply && (
+                <div>
+                  <div className="w-12 h-12 rounded-2xl bg-[#edf7e3] text-[#2e5c17] flex items-center justify-center mx-auto mb-4 border border-[#d2ebd5]">
+                    <CheckCircle2 size={26} />
+                  </div>
+
+                  <DialogTitle className="text-xl font-extrabold text-center text-[#182319] mb-1">
+                    Application Recorded!
+                  </DialogTitle>
+                  <DialogDescription className="text-xs text-center text-gray-500 mb-4">
+                    {selectedJobForApply.title} · {selectedJobForApply.company}
+                  </DialogDescription>
+
+                  <div className="p-4 bg-[#f4faee] border border-[#d2ebd5] rounded-xl text-xs text-[#204712] mb-5 leading-relaxed space-y-2">
+                    <div className="font-bold flex items-center gap-1.5 text-sm text-[#182319]">
+                      <ShieldCheck size={16} className="text-[#2e5c17]" />
+                      <span>Tracking Activated</span>
+                    </div>
+                    <p>
+                      <strong>&quot;Your application has been recorded on HireEase Services. You will now be redirected to the official job application page.&quot;</strong>
+                    </p>
+                    <div className="text-[11px] text-gray-600 pt-1 border-t border-[#d2ebd5]/60">
+                      Your candidate record has been saved in the administrative dashboard to track review and interview stages.
+                    </div>
+                  </div>
+
+                  {!currentUser && !showGuestForm && (
+                    <div className="mb-5 space-y-2 text-xs">
+                      <div className="p-3 bg-gray-50 border border-gray-200 rounded-xl">
+                        <p className="text-gray-700 font-semibold mb-2">
+                          Want to view your interview status in the candidate dashboard?
+                        </p>
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={() => setShowGuestForm(true)}
+                            className="flex-1 py-1.5 bg-white border border-gray-300 hover:border-[#2e5c17] text-gray-800 font-bold rounded-lg text-xs transition"
+                          >
+                            Enter Email to Track
+                          </button>
+                          <a
+                            href={`/auth?return_to=${encodeURIComponent(`/jobs/${selectedJobForApply.id}`)}`}
+                            className="flex-1 py-1.5 bg-[#182319] text-[#c4f568] font-bold rounded-lg text-xs text-center transition"
+                          >
+                            Sign In with Google
+                          </a>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {!currentUser && showGuestForm && (
+                    <div className="space-y-3 mb-5 text-xs">
+                      <div>
+                        <label className="block font-bold text-gray-700 mb-1">Your Full Name</label>
+                        <input
+                          type="text"
+                          placeholder="Jane Doe"
+                          value={guestName}
+                          onChange={e => setGuestName(e.target.value)}
+                          className="w-full border border-gray-300 rounded-lg p-2 text-xs"
+                        />
+                      </div>
+                      <div>
+                        <label className="block font-bold text-gray-700 mb-1">Your Email Address *</label>
+                        <input
+                          type="email"
+                          placeholder="jane@example.com"
+                          value={guestEmail}
+                          onChange={e => setGuestEmail(e.target.value)}
+                          className="w-full border border-gray-300 rounded-lg p-2 text-xs"
+                        />
+                      </div>
+                      <button
+                        onClick={handleGuestSubmitAndRedirect}
+                        disabled={isSubmittingTracking}
+                        className="w-full py-2 bg-[#182319] hover:bg-[#2b421e] text-[#c4f568] font-bold rounded-xl transition text-xs shadow-xs"
+                      >
+                        {isSubmittingTracking ? 'Saving & Redirecting...' : 'Save & Continue to Application'}
+                      </button>
+                    </div>
+                  )}
+
+                  <div className="space-y-3">
+                    <button
+                      onClick={handleDirectRedirectNow}
+                      className="w-full py-3 bg-[#182319] hover:bg-[#2b421e] text-[#c4f568] font-bold rounded-xl text-xs transition shadow-md flex items-center justify-center gap-2"
+                    >
+                      <span>Proceed to Official Application Now</span>
+                      <ExternalLink size={14} />
+                    </button>
+
+                    <div className="text-center text-[11px] text-gray-400">
+                      Automatically redirecting in <strong>{countdown}</strong> seconds...
+                    </div>
+                  </div>
+                </div>
               )}
             </DialogContent>
           </Dialog>
