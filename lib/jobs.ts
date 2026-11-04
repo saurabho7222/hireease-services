@@ -22,8 +22,9 @@ export type Job = {
 };
 
 export const trackedPlatforms = [
-  'Labelbox',
   'micro1.',
+  'sme.careers',
+  'Labelbox',
   'MERCOR',
   'xAI',
   'Alignerr',
