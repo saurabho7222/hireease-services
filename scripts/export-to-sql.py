@@ -15,6 +15,13 @@ def find_sqlite_db():
     matches = glob.glob(pattern, recursive=True)
     # Exclude metadata.sqlite
     db_files = [m for m in matches if not os.path.basename(m).startswith("metadata")]
+    for db_f in db_files:
+        try:
+            c = sqlite3.connect(db_f).cursor()
+            c.execute("SELECT count(*) FROM jobs")
+            return db_f
+        except sqlite3.OperationalError:
+            continue
     if db_files:
         return db_files[0]
     raise FileNotFoundError("Could not locate local SQLite D1 database file.")

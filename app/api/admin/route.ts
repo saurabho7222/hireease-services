@@ -4,9 +4,9 @@ export async function GET() {
   try {
     await staffUser();
     const [jobs, applications, profiles] = await Promise.all([
-      db().prepare('SELECT * FROM jobs ORDER BY created_at DESC LIMIT 1000').all<any>(),
-      db().prepare('SELECT * FROM applications ORDER BY created_at DESC LIMIT 1000').all<any>(),
-      db().prepare('SELECT * FROM profiles ORDER BY updated_at DESC LIMIT 1000').all<any>()
+      db().prepare('SELECT * FROM jobs ORDER BY created_at DESC LIMIT 5000').all<any>(),
+      db().prepare('SELECT * FROM applications ORDER BY created_at DESC LIMIT 5000').all<any>(),
+      db().prepare('SELECT * FROM profiles ORDER BY updated_at DESC LIMIT 5000').all<any>()
     ]);
 
     return json({
