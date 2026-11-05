@@ -125,3 +125,4 @@ CREATE TABLE IF NOT EXISTS outbox_emails (
   status TEXT NOT NULL DEFAULT 'sent',
   sent_at TEXT NOT NULL
 );
+
