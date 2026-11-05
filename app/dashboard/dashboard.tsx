@@ -50,6 +50,8 @@ import {
   internalProjects,
   practiceLabQuestions,
   matchingSkills,
+  getCompanyLogo,
+  getCompanyDisplayName,
   type Job
 } from '@/lib/jobs';
 import { type Profile, type Application, statusLabels } from '@/lib/profile';
@@ -997,8 +999,10 @@ ${resumeEducation}
                                       <Flame size={12} /> High demand
                                     </span>
                                   )}
-                                  <span className="portal-tag-platform">
-                                    via {j.platform || j.company || 'micro1'} · {idx === 0 ? 'Today' : `${idx * 2}d ago`}
+                                  <span className="portal-tag-platform flex items-center gap-1.5">
+                                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                                    <img src={getCompanyLogo(j.platform || j.company)} alt={j.company || 'Partner'} className="w-3.5 h-3.5 object-contain rounded-full bg-white shrink-0" />
+                                    <span>via {getCompanyDisplayName(j.platform || j.company)} · {idx === 0 ? 'Today' : `${idx * 2}d ago`}</span>
                                   </span>
                                 </div>
                                 <h3 className="text-base font-bold text-gray-900 truncate">{j.title}</h3>
@@ -1112,8 +1116,10 @@ ${resumeEducation}
                                 <div>
                                   <div className="flex items-center gap-2 flex-wrap">
                                     <span className="text-sm font-bold text-gray-900">{app.jobTitle}</span>
-                                    <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-gray-100 text-gray-700">
-                                      {app.platform || app.company || 'External'}
+                                    <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-white text-gray-700 border border-gray-200 flex items-center gap-1 shadow-2xs">
+                                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                                      <img src={getCompanyLogo(app.platform || app.company)} alt={app.company || 'Partner'} className="w-3.5 h-3.5 object-contain rounded-full bg-white shrink-0" />
+                                      <span>{getCompanyDisplayName(app.platform || app.company)}</span>
                                     </span>
                                   </div>
                                   <div className="text-xs text-gray-500 mt-0.5 flex items-center gap-2 flex-wrap">
@@ -1600,8 +1606,10 @@ ${resumeEducation}
                         >
                           <div className="min-w-0 flex-1">
                             <div className="flex items-center gap-2 mb-1.5 flex-wrap">
-                              <span className="text-xs font-bold bg-gray-100 text-gray-800 px-2.5 py-0.5 rounded">
-                                {j.platform || j.company}
+                              <span className="text-xs font-bold bg-white text-gray-800 px-2.5 py-0.5 rounded-full border border-gray-200 flex items-center gap-1.5 shadow-2xs">
+                                {/* eslint-disable-next-line @next/next/no-img-element */}
+                                <img src={getCompanyLogo(j.platform || j.company)} alt={j.company || 'Partner'} className="w-4 h-4 object-contain rounded-full bg-white shrink-0" />
+                                <span>{getCompanyDisplayName(j.platform || j.company)}</span>
                               </span>
                               <span className="text-xs bg-emerald-50 text-emerald-800 font-semibold px-2 py-0.5 rounded">
                                 {j.category}

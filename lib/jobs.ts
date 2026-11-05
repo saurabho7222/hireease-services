@@ -39,6 +39,46 @@ export const trackedPlatforms = [
   'Harvey AI'
 ];
 
+export function getCompanyLogo(company?: string): string {
+  const c = (company || '').toLowerCase().trim();
+  if (c.includes('micro1')) return '/logos/micro1.svg';
+  if (c.includes('mercor')) return '/logos/mercor.svg';
+  if (c.includes('sme')) return '/logos/sme.svg';
+  if (c.includes('turing')) return '/logos/turing.svg';
+  if (c.includes('labelbox')) return '/logos/labelbox.svg';
+  if (c.includes('scale')) return '/logos/scaleai.svg';
+  if (c.includes('elevenlabs')) return '/logos/ElevenLabs.svg';
+  if (c.includes('alignerr')) return '/logos/alignerr.png';
+  if (c.includes('anthropic')) return '/logos/anthropic.svg';
+  if (c.includes('xai')) return '/logos/xai-mark.svg';
+  if (c.includes('outlier')) return '/logos/outlier.svg';
+  if (c.includes('invisible')) return '/logos/invisible.svg';
+  if (c.includes('dataannotation')) return '/logos/dataannotation.svg';
+  if (c.includes('mindrift')) return '/logos/mindrift.svg';
+  if (c.includes('harvey')) return '/logos/harvey.svg';
+  return '/logos/micro1.svg';
+}
+
+export function getCompanyDisplayName(company?: string): string {
+  const c = (company || '').toLowerCase().trim();
+  if (c.includes('micro1')) return 'micro1';
+  if (c.includes('mercor')) return 'Mercor';
+  if (c.includes('sme')) return 'SME Careers';
+  if (c.includes('turing')) return 'Turing';
+  if (c.includes('labelbox')) return 'Labelbox';
+  if (c.includes('scale')) return 'Scale AI';
+  if (c.includes('elevenlabs')) return 'ElevenLabs';
+  if (c.includes('alignerr')) return 'Alignerr';
+  if (c.includes('anthropic')) return 'Anthropic';
+  if (c.includes('xai')) return 'xAI';
+  if (c.includes('outlier')) return 'Outlier';
+  if (c.includes('invisible')) return 'Invisible Tech';
+  if (c.includes('dataannotation')) return 'DataAnnotation';
+  if (c.includes('mindrift')) return 'Mindrift';
+  if (c.includes('harvey')) return 'Harvey AI';
+  return company || 'Partner Platform';
+}
+
 export const partners = trackedPlatforms;
 
 export const categories = [

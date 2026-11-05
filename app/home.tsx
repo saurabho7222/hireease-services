@@ -41,6 +41,8 @@ import {
   categories,
   expertiseProfiles,
   internalProjects,
+  getCompanyLogo,
+  getCompanyDisplayName,
   type Job
 } from '@/lib/jobs';
 
@@ -943,9 +945,14 @@ export default function Home() {
                   <article key={j.id} className="stn-job-card">
                     <div>
                       <div className="card-top-row">
-                        <span className="platform-tag">
-                          <span className="dot" />
-                          via {j.platform || j.company || 'micro1'}
+                        <span className="platform-tag flex items-center gap-1.5 pl-1.5 pr-2.5 py-0.5 bg-white border border-[#dce5d4] rounded-full shadow-2xs text-[#182319]">
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img
+                            src={getCompanyLogo(j.company || j.platform)}
+                            alt={j.company || 'Company'}
+                            className="w-4 h-4 object-contain rounded-full bg-white shrink-0"
+                          />
+                          <span className="font-bold">{getCompanyDisplayName(j.company || j.platform)}</span>
                         </span>
                         <div className="card-badge-group">
                           {j.urgent && (
@@ -1835,8 +1842,16 @@ export default function Home() {
             <SheetContent className="role-sheet-modern">
               {detail && (
                 <>
-                  <div className="sheet-top-meta">
-                    <span className="platform-pill">{detail.platform || detail.company}</span>
+                  <div className="sheet-top-meta flex items-center gap-2 mb-3">
+                    <div className="w-8 h-8 rounded-lg bg-white border border-[#dce5d4] p-1 flex items-center justify-center shrink-0 shadow-2xs">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={getCompanyLogo(detail.company || detail.platform)}
+                        alt={detail.company}
+                        className="w-full h-full object-contain"
+                      />
+                    </div>
+                    <span className="platform-pill font-bold">{getCompanyDisplayName(detail.company || detail.platform)}</span>
                     <span className="remote-pill">Remote</span>
                   </div>
 

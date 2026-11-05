@@ -23,7 +23,7 @@ import {
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Toaster, toast } from 'sonner';
 import { Brand } from '@/app/home';
-import { type Job } from '@/lib/jobs';
+import { getCompanyLogo, getCompanyDisplayName, type Job } from '@/lib/jobs';
 
 export default function JobDetailClient({ initialJob }: { initialJob?: Job | null }) {
   const [job, setJob] = useState<Job | null>(initialJob || null);
@@ -221,20 +221,32 @@ export default function JobDetailClient({ initialJob }: { initialJob?: Job | nul
         <div className="bg-white border border-[#dce5d4] rounded-2xl p-6 sm:p-8 shadow-xs mb-8">
           <div className="flex flex-col md:flex-row md:items-start justify-between gap-6">
             <div className="min-w-0 flex-1">
-              {/* Badges */}
-              <div className="flex items-center gap-2 flex-wrap mb-3">
-                <span className="px-3 py-1 rounded-full text-xs font-extrabold bg-[#edf7e3] text-[#2e5c17] border border-[#d2ebd5] flex items-center gap-1.5">
-                  <span className="w-2 h-2 rounded-full bg-[#468c22]"></span>
-                  {job.platform || job.company}
-                </span>
-                <span className="text-xs font-semibold text-gray-700 bg-gray-100 px-2.5 py-1 rounded-md">
-                  {job.category}
-                </span>
-                {(job.highDemand || job.urgent) && (
-                  <span className="text-xs font-extrabold px-2.5 py-1 rounded-full bg-amber-50 text-amber-700 border border-amber-200 flex items-center gap-1">
-                    <Flame size={13} /> High Demand
-                  </span>
-                )}
+              {/* Badges & Company Logo */}
+              <div className="flex items-center gap-3.5 mb-4 flex-wrap">
+                <div className="w-12 h-12 rounded-xl bg-white border border-[#dce5d4] p-2 flex items-center justify-center shrink-0 shadow-2xs">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={getCompanyLogo(job.company || job.platform)}
+                    alt={job.company || 'Company'}
+                    className="w-full h-full object-contain"
+                  />
+                </div>
+                <div className="flex flex-col">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="text-sm font-extrabold text-[#182319]">
+                      {getCompanyDisplayName(job.company || job.platform)}
+                    </span>
+                    <span className="text-xs font-semibold text-gray-700 bg-gray-100 px-2.5 py-0.5 rounded-md">
+                      {job.category}
+                    </span>
+                    {(job.highDemand || job.urgent) && (
+                      <span className="text-xs font-extrabold px-2.5 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-200 flex items-center gap-1">
+                        <Flame size={12} /> High Demand
+                      </span>
+                    )}
+                  </div>
+                  <span className="text-[11px] text-gray-500 font-medium">Verified Partner Platform</span>
+                </div>
               </div>
 
               {/* Title */}
@@ -385,8 +397,18 @@ export default function JobDetailClient({ initialJob }: { initialJob?: Job | nul
                 </div>
 
                 <div className="pt-2 border-t border-gray-100">
-                  <span className="text-gray-500 block mb-0.5">Sponsoring Platform</span>
-                  <span className="font-bold text-gray-800">{job.platform || job.company}</span>
+                  <span className="text-gray-500 block mb-1">Sponsoring Platform</span>
+                  <div className="flex items-center gap-2">
+                    <div className="w-5 h-5 rounded bg-white border border-[#dce5d4] p-0.5 flex items-center justify-center shrink-0">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={getCompanyLogo(job.company || job.platform)}
+                        alt={job.company || 'Company'}
+                        className="w-full h-full object-contain"
+                      />
+                    </div>
+                    <span className="font-bold text-gray-800">{getCompanyDisplayName(job.company || job.platform)}</span>
+                  </div>
                 </div>
 
                 <div className="pt-2 border-t border-gray-100">

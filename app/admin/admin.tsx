@@ -42,7 +42,7 @@ import { Dialog, DialogContent, DialogTitle, DialogDescription } from '@/compone
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Toaster, toast } from 'sonner';
-import { type Job, categories, trackedPlatforms } from '@/lib/jobs';
+import { type Job, categories, trackedPlatforms, getCompanyLogo, getCompanyDisplayName } from '@/lib/jobs';
 import {
   type Profile,
   type Application,
@@ -927,8 +927,10 @@ export default function Admin({ email }: { email: string }) {
                                   </span>
                                   <span className="text-xs text-gray-400">·</span>
                                   <span className="text-xs font-semibold text-gray-700">{a.jobTitle}</span>
-                                  <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-gray-100 text-gray-600 border border-gray-200">
-                                    {a.company || 'Partner'}
+                                  <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-white text-gray-700 border border-gray-200 flex items-center gap-1 shadow-2xs">
+                                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                                    <img src={getCompanyLogo(a.company)} alt={a.company || 'Partner'} className="w-3.5 h-3.5 object-contain rounded-full" />
+                                    <span>{getCompanyDisplayName(a.company)}</span>
                                   </span>
                                   {a.isSample && (
                                     <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-200">
@@ -1219,8 +1221,10 @@ export default function Admin({ email }: { email: string }) {
                       >
                         <div>
                           <div className="flex items-center gap-2 mb-1">
-                            <span className="text-[10px] font-bold uppercase tracking-wider text-[#2e5c17] bg-[#edf7e3] px-2 py-0.5 rounded-md">
-                              {j.company}
+                            <span className="text-[10px] font-bold uppercase tracking-wider text-[#2e5c17] bg-[#edf7e3] px-2 py-0.5 rounded-md flex items-center gap-1.5 border border-[#d2ebd5]">
+                              {/* eslint-disable-next-line @next/next/no-img-element */}
+                              <img src={getCompanyLogo(j.company)} alt={j.company} className="w-3.5 h-3.5 object-contain rounded-full bg-white shrink-0" />
+                              <span>{getCompanyDisplayName(j.company)}</span>
                             </span>
                             <span
                               className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded-md ${

@@ -24,7 +24,7 @@ import {
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Toaster, toast } from 'sonner';
 import { Brand } from '@/app/home';
-import { categories, trackedPlatforms, type Job } from '@/lib/jobs';
+import { categories, trackedPlatforms, getCompanyLogo, getCompanyDisplayName, type Job } from '@/lib/jobs';
 
 export default function JobsClient() {
   const [jobs, setJobs] = useState<Job[]>([]);
@@ -505,12 +505,17 @@ export default function JobsClient() {
                     className="bg-white border border-[#dce5d4] hover:border-[#77ab3b] rounded-2xl p-5 shadow-xs hover:shadow-md transition-all flex flex-col justify-between group sm:aspect-square sm:max-h-[390px] min-h-[350px] overflow-hidden"
                   >
                     <div>
-                      {/* Top Badges */}
+                      {/* Top Badges & Company Logo */}
                       <div className="flex items-center justify-between gap-2 mb-2 flex-wrap">
                         <div className="flex items-center gap-1.5 flex-wrap">
-                          <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-[#edf7e3] text-[#2e5c17] border border-[#d2ebd5] flex items-center gap-1">
-                            <span className="w-1.5 h-1.5 rounded-full bg-[#468c22]"></span>
-                            {job.platform || job.company}
+                          <span className="pl-1.5 pr-2.5 py-0.5 rounded-full text-xs font-bold bg-white text-[#182319] border border-[#d2ebd5] shadow-2xs flex items-center gap-1.5">
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img
+                              src={getCompanyLogo(job.company || job.platform)}
+                              alt={job.company || 'Company'}
+                              className="w-4 h-4 object-contain rounded-full bg-white shrink-0"
+                            />
+                            <span>{getCompanyDisplayName(job.company || job.platform)}</span>
                           </span>
                           <span className="text-[11px] font-semibold text-gray-600 bg-gray-100 px-2 py-0.5 rounded-md">
                             {job.category}
