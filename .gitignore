@@ -52,6 +52,9 @@ next-env.d.ts
 *.sqlite
 hireease-*.sql
 
+# Whitelist deploy migration files for production CI/CD
+!migrations/*.sql
+
 # candidate uploaded documents
 /public/resumes/*
 !/public/resumes/.gitkeep
