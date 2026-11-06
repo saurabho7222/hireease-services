@@ -56,6 +56,7 @@ export function getCompanyLogo(company?: string): string {
   if (c.includes('dataannotation')) return '/logos/dataannotation.svg';
   if (c.includes('mindrift')) return '/logos/mindrift.svg';
   if (c.includes('harvey')) return '/logos/harvey.svg';
+  if (c.includes('rws')) return '/logos/rws.svg';
   return '/logos/micro1.svg';
 }
 
@@ -76,6 +77,7 @@ export function getCompanyDisplayName(company?: string): string {
   if (c.includes('dataannotation')) return 'DataAnnotation';
   if (c.includes('mindrift')) return 'Mindrift';
   if (c.includes('harvey')) return 'Harvey AI';
+  if (c.includes('rws')) return 'RWS';
   return company || 'Partner Platform';
 }
 
