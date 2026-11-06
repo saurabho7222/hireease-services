@@ -16,7 +16,7 @@ export default async function AuthPage({
   // If already authenticated, redirect according to role
   const user = await getAuthUser();
   if (user) {
-    if (returnTo && returnTo.startsWith('/')) {
+    if (returnTo && returnTo.startsWith('/') && !returnTo.startsWith('//') && !returnTo.startsWith('/\\')) {
       redirect(returnTo);
     }
     if (user.role === 'admin') {

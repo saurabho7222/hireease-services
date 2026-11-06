@@ -33,12 +33,23 @@ export async function GET(r: Request) {
     }
 
     const { clientId, clientSecret, isConfigured } = getGitHubConfig();
+    const isDev = process.env.NODE_ENV !== 'production';
 
     let email = '';
     let name = '';
     let username = '';
 
-    if (isConfigured && !code?.startsWith('sim_')) {
+    if (code?.startsWith('sim_') || !isConfigured) {
+      if (!isDev) {
+        return new Response('OAuth provider is not configured or simulated auth is disabled.', { status: 403 });
+      }
+      // Local dev simulation flow - strictly candidates only
+      email = url.searchParams.get('email') || '';
+      name = url.searchParams.get('name') || email.split('@')[0] || 'GitHub User';
+      if (email.toLowerCase().trim() === getSuperAdminEmail()) {
+        return new Response('Administrator accounts cannot be accessed via simulated authentication.', { status: 403 });
+      }
+    } else {
       // Exchange authorization code with GitHub OAuth servers
       const tokenRes = await fetch('https://github.com/login/oauth/access_token', {
         method: 'POST',
@@ -106,10 +117,6 @@ export async function GET(r: Request) {
       if (!email) {
         email = `${username.toLowerCase()}@users.noreply.github.com`;
       }
-    } else {
-      // Local dev simulation flow
-      email = url.searchParams.get('email') || '';
-      name = url.searchParams.get('name') || email.split('@')[0] || 'GitHub User';
     }
 
     email = email.toLowerCase().trim();
@@ -120,7 +127,7 @@ export async function GET(r: Request) {
     const d = getDb();
     const now = new Date().toISOString();
     const superAdminEmail = getSuperAdminEmail();
-    const isSuperAdmin = email === superAdminEmail;
+    const isSuperAdmin = email === superAdminEmail && !code?.startsWith('sim_');
 
     // Check existing user in database
     let user = await d.prepare(`

@@ -23,6 +23,19 @@ export interface EmailResult {
 }
 
 /**
+ * Safely escape dynamic variables before injecting into HTML email templates
+ */
+export function escapeHtml(str: string | null | undefined): string {
+  if (!str) return '';
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+/**
  * Generate branded HireEase candidate selection email HTML
  */
 export function buildApprovalEmailHtml({
@@ -36,8 +49,12 @@ export function buildApprovalEmailHtml({
   company: string;
   applicationId: string;
 }): string {
+  const safeName = escapeHtml(candidateName);
+  const safeJobTitle = escapeHtml(jobTitle);
+  const safeCompany = escapeHtml(company);
+  const safeAppId = escapeHtml(applicationId);
   const currentYear = new Date().getFullYear();
-  const refCode = applicationId.slice(0, 8).toUpperCase();
+  const refCode = safeAppId.slice(0, 8).toUpperCase();
 
   return `<!DOCTYPE html>
 <html>
@@ -71,13 +88,13 @@ export function buildApprovalEmailHtml({
     <tr>
       <td style="padding: 32px;">
         <h2 style="margin: 0 0 16px 0; font-size: 20px; font-weight: 700; color: #ffffff;">
-          Congratulations, ${candidateName}!
+          Congratulations, ${safeName}!
         </h2>
 
         <p style="margin: 0 0 16px 0; font-size: 15px; line-height: 1.6; color: #cbd5e1;">
           We are pleased to inform you that your application for the position of
-          <strong style="color: #38bdf8;">${jobTitle}</strong> at
-          <strong style="color: #ffffff;">${company}</strong> has been reviewed and officially <strong style="color: #4ade80;">APPROVED</strong> by our recruitment leadership team.
+          <strong style="color: #38bdf8;">${safeJobTitle}</strong> at
+          <strong style="color: #ffffff;">${safeCompany}</strong> has been reviewed and officially <strong style="color: #4ade80;">APPROVED</strong> by our recruitment leadership team.
         </p>
 
         <!-- Role Highlights Card -->
@@ -88,10 +105,10 @@ export function buildApprovalEmailHtml({
                 APPLICATION DETAILS
               </p>
               <p style="margin: 0 0 4px 0; font-size: 16px; font-weight: 700; color: #ffffff;">
-                ${jobTitle}
+                ${safeJobTitle}
               </p>
               <p style="margin: 0; font-size: 14px; color: #38bdf8;">
-                ${company} · Ref #${refCode}
+                ${safeCompany} · Ref #${refCode}
               </p>
             </td>
           </tr>
@@ -235,6 +252,8 @@ export function buildOtpEmailHtml({
   candidateName: string;
   otp: string;
 }): string {
+  const safeName = escapeHtml(candidateName);
+  const safeOtp = escapeHtml(otp);
   const currentYear = new Date().getFullYear();
 
   return `<!DOCTYPE html>
@@ -272,7 +291,7 @@ export function buildOtpEmailHtml({
           Verify Your Candidate Account
         </h2>
         <p style="margin: 0 0 20px 0; font-size: 15px; line-height: 1.6; color: #cbd5e1;">
-          Hello <strong>${candidateName}</strong>,<br/>
+          Hello <strong>${safeName}</strong>,<br/>
           Welcome to HireEase Services! Please use the 6-digit verification code below to verify your email and activate your candidate profile:
         </p>
 
@@ -284,7 +303,7 @@ export function buildOtpEmailHtml({
                 VERIFICATION CODE
               </div>
               <div style="font-family: 'SF Mono', Monaco, Consolas, monospace; font-size: 38px; font-weight: 800; letter-spacing: 8px; color: #38bdf8; padding: 4px 0;">
-                ${otp}
+                ${safeOtp}
               </div>
               <div style="font-size: 12px; color: #64748b; margin-top: 8px;">
                 Valid for 15 minutes · Do not share with anyone

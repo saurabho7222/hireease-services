@@ -15,6 +15,13 @@ def find_sqlite_db():
     matches = glob.glob(pattern, recursive=True)
     # Exclude metadata.sqlite
     db_files = [m for m in matches if not os.path.basename(m).startswith("metadata")]
+    for db_f in db_files:
+        try:
+            c = sqlite3.connect(db_f).cursor()
+            c.execute("SELECT count(*) FROM jobs")
+            return db_f
+        except sqlite3.OperationalError:
+            continue
     if db_files:
         return db_files[0]
     raise FileNotFoundError("Could not locate local SQLite D1 database file.")
@@ -192,7 +199,8 @@ CREATE TABLE jobs (
     responsibilities TEXT NOT NULL DEFAULT '[]',
     status VARCHAR(32) NOT NULL DEFAULT 'open',
     created_at VARCHAR(64) NOT NULL,
-    updated_at VARCHAR(64) NOT NULL
+    updated_at VARCHAR(64) NOT NULL,
+    external_url TEXT
 );
 CREATE INDEX idx_jobs_status_created ON jobs (status, created_at);
 
@@ -297,9 +305,219 @@ CREATE INDEX idx_verifications_email ON email_verifications (email);
                 f.write("\n")
 
     conn.close()
+
+    # 3. MySQL / MariaDB Dump
+    with open(output_mysql, "w", encoding="utf-8") as f:
+        f.write(f"-- HireEase Services Database Dump (MySQL / MariaDB Format)\n")
+        f.write(f"-- Exported on: {now_str}\n")
+        f.write(f"-- Target: MySQL 5.7+ / 8.0+ / MariaDB / AWS RDS Aurora\n\n")
+
+        f.write("""CREATE DATABASE IF NOT EXISTS `hireease` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+USE `hireease`;
+
+SET FOREIGN_KEY_CHECKS = 0;
+
+-- Drop tables in reverse order
+DROP TABLE IF EXISTS `email_verifications`;
+DROP TABLE IF EXISTS `outbox_emails`;
+DROP TABLE IF EXISTS `admin_access_requests`;
+DROP TABLE IF EXISTS `sessions`;
+DROP TABLE IF EXISTS `applications`;
+DROP TABLE IF EXISTS `jobs`;
+DROP TABLE IF EXISTS `staff`;
+DROP TABLE IF EXISTS `profiles`;
+DROP TABLE IF EXISTS `users`;
+
+-- ----------------------------
+-- Table: users
+-- ----------------------------
+CREATE TABLE `users` (
+  `id` VARCHAR(64) NOT NULL,
+  `email` VARCHAR(255) NOT NULL,
+  `password_hash` TEXT DEFAULT NULL,
+  `salt` VARCHAR(64) DEFAULT NULL,
+  `name` VARCHAR(255) NOT NULL,
+  `role` VARCHAR(32) NOT NULL DEFAULT 'candidate',
+  `provider` VARCHAR(32) NOT NULL DEFAULT 'credentials',
+  `email_verified` INT NOT NULL DEFAULT 0,
+  `created_at` VARCHAR(64) NOT NULL,
+  `updated_at` VARCHAR(64) NOT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `idx_users_email` (`email`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ----------------------------
+-- Table: profiles
+-- ----------------------------
+CREATE TABLE `profiles` (
+  `user_id` VARCHAR(64) NOT NULL,
+  `email` VARCHAR(255) NOT NULL,
+  `name` VARCHAR(255) NOT NULL,
+  `address` TEXT NOT NULL,
+  `city` VARCHAR(128) NOT NULL DEFAULT '',
+  `country` VARCHAR(128) NOT NULL DEFAULT '',
+  `education` VARCHAR(255) NOT NULL DEFAULT '',
+  `institution` VARCHAR(255) NOT NULL DEFAULT '',
+  `graduation_year` VARCHAR(16) NOT NULL DEFAULT '',
+  `skills` TEXT NOT NULL,
+  `experience` TEXT NOT NULL,
+  `resume_key` TEXT DEFAULT NULL,
+  `resume_name` VARCHAR(255) DEFAULT NULL,
+  `consented_at` VARCHAR(64) NOT NULL,
+  `updated_at` VARCHAR(64) NOT NULL,
+  PRIMARY KEY (`user_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ----------------------------
+-- Table: jobs
+-- ----------------------------
+CREATE TABLE `jobs` (
+  `id` VARCHAR(64) NOT NULL,
+  `title` VARCHAR(255) NOT NULL,
+  `company` VARCHAR(255) NOT NULL,
+  `category` VARCHAR(64) NOT NULL,
+  `location` VARCHAR(255) NOT NULL,
+  `type` VARCHAR(64) NOT NULL,
+  `experience` VARCHAR(255) NOT NULL,
+  `compensation` VARCHAR(255) NOT NULL,
+  `description` MEDIUMTEXT NOT NULL,
+  `skills` TEXT NOT NULL,
+  `responsibilities` TEXT NOT NULL,
+  `status` VARCHAR(32) NOT NULL DEFAULT 'open',
+  `created_at` VARCHAR(64) NOT NULL,
+  `updated_at` VARCHAR(64) NOT NULL,
+  `external_url` TEXT DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  KEY `idx_jobs_status_created` (`status`, `created_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ----------------------------
+-- Table: applications
+-- ----------------------------
+CREATE TABLE `applications` (
+  `id` VARCHAR(64) NOT NULL,
+  `user_id` VARCHAR(64) NOT NULL,
+  `job_id` VARCHAR(64) NOT NULL,
+  `job_title` VARCHAR(255) NOT NULL,
+  `company` VARCHAR(255) NOT NULL,
+  `is_sample` INT NOT NULL DEFAULT 0,
+  `snapshot` MEDIUMTEXT NOT NULL,
+  `status` VARCHAR(32) NOT NULL DEFAULT 'submitted',
+  `created_at` VARCHAR(64) NOT NULL,
+  `updated_at` VARCHAR(64) NOT NULL,
+  `updated_by` VARCHAR(64) DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `idx_applications_user_job` (`user_id`, `job_id`),
+  KEY `idx_applications_created` (`created_at`),
+  CONSTRAINT `fk_app_user` FOREIGN KEY (`user_id`) REFERENCES `profiles` (`user_id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ----------------------------
+-- Table: staff
+-- ----------------------------
+CREATE TABLE `staff` (
+  `id` VARCHAR(64) NOT NULL,
+  `user_id` VARCHAR(64) NOT NULL,
+  `email` VARCHAR(255) NOT NULL,
+  `created_at` VARCHAR(64) NOT NULL,
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ----------------------------
+-- Table: sessions
+-- ----------------------------
+CREATE TABLE `sessions` (
+  `id` VARCHAR(64) NOT NULL,
+  `user_id` VARCHAR(64) NOT NULL,
+  `role` VARCHAR(32) NOT NULL,
+  `expires_at` VARCHAR(64) NOT NULL,
+  `created_at` VARCHAR(64) NOT NULL,
+  PRIMARY KEY (`id`),
+  KEY `idx_sessions_user_id` (`user_id`),
+  CONSTRAINT `fk_session_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ----------------------------
+-- Table: admin_access_requests
+-- ----------------------------
+CREATE TABLE `admin_access_requests` (
+  `id` VARCHAR(64) NOT NULL,
+  `user_id` VARCHAR(64) NOT NULL,
+  `email` VARCHAR(255) NOT NULL,
+  `name` VARCHAR(255) NOT NULL,
+  `reason` TEXT NOT NULL,
+  `status` VARCHAR(32) NOT NULL DEFAULT 'pending',
+  `created_at` VARCHAR(64) NOT NULL,
+  `reviewed_at` VARCHAR(64) DEFAULT NULL,
+  `reviewed_by` VARCHAR(64) DEFAULT NULL,
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ----------------------------
+-- Table: outbox_emails
+-- ----------------------------
+CREATE TABLE `outbox_emails` (
+  `id` VARCHAR(64) NOT NULL,
+  `recipient_email` VARCHAR(255) NOT NULL,
+  `recipient_name` VARCHAR(255) DEFAULT NULL,
+  `subject` TEXT NOT NULL,
+  `text_content` MEDIUMTEXT DEFAULT NULL,
+  `html_content` MEDIUMTEXT DEFAULT NULL,
+  `status` VARCHAR(32) NOT NULL DEFAULT 'sent',
+  `sent_at` VARCHAR(64) NOT NULL,
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ----------------------------
+-- Table: email_verifications
+-- ----------------------------
+CREATE TABLE `email_verifications` (
+  `id` VARCHAR(64) NOT NULL,
+  `email` VARCHAR(255) NOT NULL,
+  `otp` VARCHAR(16) NOT NULL,
+  `expires_at` VARCHAR(64) NOT NULL,
+  `created_at` VARCHAR(64) NOT NULL,
+  PRIMARY KEY (`id`),
+  KEY `idx_verifications_email` (`email`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+SET FOREIGN_KEY_CHECKS = 1;
+
+-- ----------------------------
+-- DATA INSERTS
+-- ----------------------------
+
+""")
+        conn_mysql = sqlite3.connect(db_path)
+        cur_mysql = conn_mysql.cursor()
+        for table in tables_to_dump:
+            cur_mysql.execute(f"PRAGMA table_info(\"{table}\");")
+            cols = [info[1] for info in cur_mysql.fetchall()]
+            col_list_str = ", ".join([f'`{c}`' for c in cols])
+
+            cur_mysql.execute(f"SELECT * FROM \"{table}\";")
+            rows = cur_mysql.fetchall()
+            if rows:
+                f.write(f"-- Inserts for {table}\n")
+                for r in rows:
+                    val_strs = [escape_sql_value(v) for v in r]
+                    f.write(f"INSERT INTO `{table}` ({col_list_str}) VALUES ({', '.join(val_strs)});\n")
+                f.write("\n")
+        conn_mysql.close()
+
+    # Also synchronize dumps to workspace root if different
+    workspace_root = os.path.dirname(project_root)
+    if os.path.isdir(workspace_root) and os.path.basename(project_root) == "hireease-site":
+        import shutil
+        for fname in ["hireease-database.sql", "hireease-postgres.sql", "hireease-mysql.sql"]:
+            src = os.path.join(project_root, fname)
+            dst = os.path.join(workspace_root, fname)
+            shutil.copy2(src, dst)
+
     print(f"Export completed successfully!")
     print(f"Universal / Standard SQL: {output_universal}")
     print(f"PostgreSQL SQL: {output_postgres}")
+    print(f"MySQL / MariaDB SQL: {output_mysql}")
 
 if __name__ == "__main__":
     export_sql()

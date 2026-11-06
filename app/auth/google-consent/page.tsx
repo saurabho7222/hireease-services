@@ -185,46 +185,6 @@ function GoogleConsentInner() {
                   Candidate
                 </span>
               </button>
-
-              <button
-                type="button"
-                onClick={() => proceedWithDirectAccount('admin@hireease.com', 'HireEase Super Admin')}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  padding: '11px 14px',
-                  backgroundColor: '#fbfdfa',
-                  border: '1px solid #e1ebd8',
-                  borderRadius: '8px',
-                  cursor: 'pointer',
-                  textAlign: 'left'
-                }}
-              >
-                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                  <div style={{
-                    width: '32px',
-                    height: '32px',
-                    borderRadius: '50%',
-                    backgroundColor: '#dbeafe',
-                    color: '#1e40af',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    fontWeight: '700',
-                    fontSize: '13px'
-                  }}>
-                    H
-                  </div>
-                  <div>
-                    <div style={{ fontSize: '13px', fontWeight: '600', color: '#18201b' }}>HireEase Super Admin</div>
-                    <div style={{ fontSize: '11px', color: '#74836c' }}>admin@hireease.com</div>
-                  </div>
-                </div>
-                <span style={{ fontSize: '10px', fontWeight: 700, padding: '2px 6px', borderRadius: '4px', backgroundColor: '#eff6ff', color: '#1d4ed8', border: '1px solid #bfdbfe' }}>
-                  Super Admin
-                </span>
-              </button>
             </div>
 
             {/* Custom Google Email Form */}

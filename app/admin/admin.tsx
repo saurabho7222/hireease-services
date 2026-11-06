@@ -33,14 +33,17 @@ import {
   GraduationCap,
   Building,
   Briefcase,
-  FileDown
+  FileDown,
+  UserPlus,
+  Globe,
+  Copy
 } from 'lucide-react';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Toaster, toast } from 'sonner';
-import { type Job, categories, trackedPlatforms } from '@/lib/jobs';
+import { type Job, type InHouseProject, categories, trackedPlatforms, getCompanyLogo, getCompanyDisplayName } from '@/lib/jobs';
 import {
   type Profile,
   type Application,
@@ -57,7 +60,7 @@ async function api(url: string, opts?: RequestInit) {
 
 export default function Admin({ email }: { email: string }) {
   const [data, setData] = useState<{ jobs: Job[]; applications: Application[]; candidates: Profile[] } | null>(null);
-  const [accessData, setAccessData] = useState<{ isSuperAdmin: boolean; admins: any[]; requests: any[] } | null>(null);
+  const [accessData, setAccessData] = useState<{ isSuperAdmin: boolean; admins: any[]; requests: any[]; auditLogs?: any[] } | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [setup, setSetup] = useState('');
@@ -68,11 +71,15 @@ export default function Admin({ email }: { email: string }) {
   const [jobType, setJobType] = useState('Contract');
   const [jobStatus, setJobStatus] = useState('open');
   const [formError, setFormError] = useState('');
+
+  // Super Admin flag: designated email or API verification
+  const isSuperAdminUser = (email && (email.toLowerCase() === 'saurabho7222@gmail.com' || email.toLowerCase() === 'admin@hireease.com')) || Boolean(accessData?.isSuperAdmin);
   const [candidate, setCandidate] = useState<Profile | null>(null);
 
   // ATS Filters and Search States
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [roleFilter, setRoleFilter] = useState<string>('all');
+  const [platformFilter, setPlatformFilter] = useState<string>('all');
   const [appSearch, setAppSearch] = useState<string>('');
   const [candidateSearch, setCandidateSearch] = useState<string>('');
 
@@ -81,6 +88,29 @@ export default function Admin({ email }: { email: string }) {
   const [evalNotes, setEvalNotes] = useState<string>('');
   const [evalRating, setEvalRating] = useState<number>(0);
   const [evalSaving, setEvalSaving] = useState<boolean>(false);
+  const [interviewDateInput, setInterviewDateInput] = useState<string>('');
+
+  // Add Admin Modal States
+  const [addAdminModalOpen, setAddAdminModalOpen] = useState(false);
+  const [newAdminName, setNewAdminName] = useState('');
+  const [newAdminEmail, setNewAdminEmail] = useState('');
+  const [newAdminRole, setNewAdminRole] = useState<'admin' | 'recruiter'>('admin');
+  const [newAdminPassword, setNewAdminPassword] = useState('');
+  const [isAddingAdmin, setIsAddingAdmin] = useState(false);
+
+  // In-House Projects ATS States
+  const [inhouseProjects, setInhouseProjects] = useState<InHouseProject[]>([]);
+  const [addInhouseModalOpen, setAddInhouseModalOpen] = useState(false);
+  const [newInhouseTitle, setNewInhouseTitle] = useState('');
+  const [newInhouseClient, setNewInhouseClient] = useState('');
+  const [newInhouseDomain, setNewInhouseDomain] = useState('Healthcare');
+  const [newInhousePayout, setNewInhousePayout] = useState('$85/hr');
+  const [newInhouseHours, setNewInhouseHours] = useState('20-30 hrs/week');
+  const [newInhouseDuration, setNewInhouseDuration] = useState('8 weeks');
+  const [newInhouseSkills, setNewInhouseSkills] = useState('');
+  const [newInhouseDescription, setNewInhouseDescription] = useState('');
+  const [isSavingInhouse, setIsSavingInhouse] = useState(false);
+  const [deletingInhouseId, setDeletingInhouseId] = useState<string | null>(null);
 
   async function load() {
     try {
@@ -89,6 +119,9 @@ export default function Admin({ email }: { email: string }) {
         api('/api/admin/access').catch(() => null)
       ]);
       setData(adminData);
+      if (adminData?.inhouseProjects) {
+        setInhouseProjects(adminData.inhouseProjects);
+      }
       if (accessRes) setAccessData(accessRes);
       setError('');
     } catch (e) {
@@ -187,7 +220,8 @@ export default function Admin({ email }: { email: string }) {
     newStatus: string,
     notes?: string,
     rating?: number,
-    sendEmail?: boolean
+    sendEmail?: boolean,
+    interviewDate?: string
   ) {
     setApprovingId(a.id);
     try {
@@ -199,6 +233,7 @@ export default function Admin({ email }: { email: string }) {
           status: newStatus,
           notes: notes !== undefined ? notes : a.notes,
           rating: rating !== undefined ? rating : a.rating,
+          interviewDate: interviewDate !== undefined ? interviewDate : a.interviewDate,
           sendEmail: sendEmail ?? (newStatus === 'selected' || newStatus === 'approved')
         })
       });
@@ -214,7 +249,8 @@ export default function Admin({ email }: { email: string }) {
                   ...item,
                   status: newStatus,
                   notes: res.notes !== undefined ? res.notes : (notes ?? item.notes),
-                  rating: res.rating !== undefined ? res.rating : (rating ?? item.rating)
+                  rating: res.rating !== undefined ? res.rating : (rating ?? item.rating),
+                  interviewDate: interviewDate !== undefined ? interviewDate : item.interviewDate
                 }
               : item
           )
@@ -226,7 +262,8 @@ export default function Admin({ email }: { email: string }) {
           ...prev,
           status: newStatus,
           notes: res.notes !== undefined ? res.notes : (notes ?? prev.notes),
-          rating: res.rating !== undefined ? res.rating : (rating ?? prev.rating)
+          rating: res.rating !== undefined ? res.rating : (rating ?? prev.rating),
+          interviewDate: interviewDate !== undefined ? interviewDate : prev.interviewDate
         } : null);
       }
 
@@ -242,13 +279,13 @@ export default function Admin({ email }: { email: string }) {
     }
   }
 
-  // Save notes from the Candidate Dossier modal
+  // Save notes and interview date from the Candidate Dossier modal
   async function saveDossierNotes() {
     if (!selectedApplication) return;
     setEvalSaving(true);
     try {
-      await update(selectedApplication, selectedApplication.status, evalNotes, evalRating, false);
-      toast.success('Internal review notes and rating saved.');
+      await update(selectedApplication, selectedApplication.status, evalNotes, evalRating, false, interviewDateInput);
+      toast.success('Internal review notes and interview details saved.');
     } catch (e) {
       toast.error((e as Error).message);
     } finally {
@@ -260,6 +297,52 @@ export default function Admin({ email }: { email: string }) {
     setSelectedApplication(app);
     setEvalNotes(app.notes || '');
     setEvalRating(app.rating || 0);
+    setInterviewDateInput(app.interviewDate || '');
+  }
+
+  async function handleCreateAdmin() {
+    if (!newAdminEmail.trim() || !newAdminName.trim()) {
+      toast.error('Please enter name and email for the administrator.');
+      return;
+    }
+    setIsAddingAdmin(true);
+    try {
+      const res = await api('/api/admin/access', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'add_admin',
+          name: newAdminName.trim(),
+          email: newAdminEmail.trim(),
+          role: newAdminRole,
+          temporaryPassword: newAdminPassword.trim() || undefined
+        })
+      });
+      toast.success(res.message || 'Administrator account added successfully!');
+      setAddAdminModalOpen(false);
+      setNewAdminName('');
+      setNewAdminEmail('');
+      setNewAdminPassword('');
+      await load();
+    } catch (e) {
+      toast.error((e as Error).message);
+    } finally {
+      setIsAddingAdmin(false);
+    }
+  }
+
+  async function handleChangeAdminRole(userId: string, role: 'admin' | 'recruiter') {
+    try {
+      const res = await api('/api/admin/access', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId, action: 'change_role', role })
+      });
+      toast.success(res.message);
+      await load();
+    } catch (e) {
+      toast.error((e as Error).message);
+    }
   }
 
   async function handleAdminAccessAction(userId: string, action: 'grant' | 'revoke') {
@@ -276,22 +359,83 @@ export default function Admin({ email }: { email: string }) {
     }
   }
 
+  async function handleCreateInhouseProject(e: React.FormEvent) {
+    e.preventDefault();
+    if (!newInhouseTitle.trim() || !newInhouseClient.trim() || !newInhouseDescription.trim()) {
+      toast.error('Please fill in title, client name, and project description.');
+      return;
+    }
+    const skillsList = newInhouseSkills
+      .split(',')
+      .map(s => s.trim())
+      .filter(Boolean);
+    if (skillsList.length === 0) {
+      toast.error('Please specify at least one required skill (separated by commas).');
+      return;
+    }
+    setIsSavingInhouse(true);
+    try {
+      await api('/api/inhouse-projects', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title: newInhouseTitle.trim(),
+          client: newInhouseClient.trim(),
+          domain: newInhouseDomain.trim(),
+          payout: newInhousePayout.trim(),
+          estimatedHours: newInhouseHours.trim(),
+          duration: newInhouseDuration.trim(),
+          requiredSkills: skillsList,
+          description: newInhouseDescription.trim()
+        })
+      });
+      toast.success('In-house project published successfully!');
+      setAddInhouseModalOpen(false);
+      setNewInhouseTitle('');
+      setNewInhouseClient('');
+      setNewInhouseSkills('');
+      setNewInhouseDescription('');
+      await load();
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to create in-house project.');
+    } finally {
+      setIsSavingInhouse(false);
+    }
+  }
+
+  async function handleDeleteInhouseProject(id: string) {
+    if (!confirm('Are you sure you want to delete this in-house project?')) return;
+    setDeletingInhouseId(id);
+    try {
+      await api(`/api/inhouse-projects/${id}`, { method: 'DELETE' });
+      setInhouseProjects(prev => prev.filter(p => p.id !== id));
+      toast.success('In-house project deleted successfully.');
+      await load();
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to delete project.');
+    } finally {
+      setDeletingInhouseId(null);
+    }
+  }
+
   // Filtered Applications Pipeline
   const filteredApplications = useMemo(() => {
     if (!data?.applications) return [];
     return data.applications.filter(a => {
       // Status Filter
       if (statusFilter !== 'all') {
-        if (statusFilter === 'pending') {
-          if (a.status !== 'pending' && a.status !== 'submitted') return false;
-        } else if (statusFilter === 'review') {
-          if (a.status !== 'review' && a.status !== 'under_review') return false;
+        if (statusFilter === 'clicked_apply') {
+          if (a.status !== 'clicked_apply' && a.status !== 'redirected') return false;
+        } else if (statusFilter === 'awaiting_confirmation') {
+          if (a.status !== 'awaiting_confirmation' && a.status !== 'pending') return false;
+        } else if (statusFilter === 'submitted') {
+          if (a.status !== 'submitted') return false;
+        } else if (statusFilter === 'assessment') {
+          if (a.status !== 'assessment') return false;
         } else if (statusFilter === 'interview') {
-          if (a.status !== 'interview' && a.status !== 'interview_scheduled' && a.status !== 'interview_done') return false;
-        } else if (statusFilter === 'approved') {
-          if (a.status !== 'approved' && a.status !== 'selected') return false;
-        } else if (statusFilter === 'hired') {
-          if (a.status !== 'hired') return false;
+          if (a.status !== 'interview' && a.status !== 'interview_scheduled' && a.status !== 'interview_done' && a.status !== 'interview_completed') return false;
+        } else if (statusFilter === 'selected') {
+          if (a.status !== 'selected' && a.status !== 'approved' && a.status !== 'hired') return false;
         } else if (statusFilter === 'rejected') {
           if (a.status !== 'rejected' && a.status !== 'not_selected') return false;
         }
@@ -300,6 +444,12 @@ export default function Admin({ email }: { email: string }) {
       // Role Filter
       if (roleFilter !== 'all') {
         if (a.jobTitle !== roleFilter && a.jobId !== roleFilter) return false;
+      }
+
+      // Platform Filter
+      if (platformFilter !== 'all') {
+        const plat = (a.company || a.platform || '').toLowerCase();
+        if (!plat.includes(platformFilter.toLowerCase())) return false;
       }
 
       // Search Filter
@@ -318,7 +468,7 @@ export default function Admin({ email }: { email: string }) {
 
       return true;
     });
-  }, [data?.applications, statusFilter, roleFilter, appSearch]);
+  }, [data?.applications, statusFilter, roleFilter, platformFilter, appSearch]);
 
   // Filtered Talent Pool
   const filteredCandidates = useMemo(() => {
@@ -342,64 +492,17 @@ export default function Admin({ email }: { email: string }) {
     const apps = data?.applications || [];
     return {
       total: apps.length,
-      pending: apps.filter(a => a.status === 'pending' || a.status === 'submitted').length,
-      review: apps.filter(a => a.status === 'review' || a.status === 'under_review').length,
-      interview: apps.filter(a => a.status === 'interview' || a.status === 'interview_scheduled' || a.status === 'interview_done').length,
-      approved: apps.filter(a => a.status === 'approved' || a.status === 'selected').length,
-      hired: apps.filter(a => a.status === 'hired').length,
+      clickedApply: apps.filter(a => a.status === 'clicked_apply' || a.status === 'redirected').length,
+      awaitingConfirmation: apps.filter(a => a.status === 'awaiting_confirmation' || a.status === 'pending').length,
+      submitted: apps.filter(a => a.status === 'submitted').length,
+      assessment: apps.filter(a => a.status === 'assessment').length,
+      interview: apps.filter(a => a.status === 'interview' || a.status === 'interview_scheduled' || a.status === 'interview_done' || a.status === 'interview_completed').length,
+      selected: apps.filter(a => a.status === 'selected' || a.status === 'approved' || a.status === 'hired').length,
       rejected: apps.filter(a => a.status === 'rejected' || a.status === 'not_selected').length,
       candidates: data?.candidates?.length || 0,
       openJobs: data?.jobs?.filter(j => j.status === 'open').length || 0
     };
   }, [data]);
-
-  // CSV Export Function
-  function exportCandidatesCSV() {
-    if (!filteredApplications.length) {
-      toast.error('No candidate applications to export.');
-      return;
-    }
-    const headers = [
-      'Application ID',
-      'Candidate Name',
-      'Email',
-      'Job Title',
-      'Company',
-      'Status',
-      'Applied Date',
-      'City',
-      'Country',
-      'Education',
-      'Skills',
-      'Recruiter Notes',
-      'Rating'
-    ];
-    const rows = filteredApplications.map(a => [
-      `"${a.id}"`,
-      `"${(a.profile?.name || 'Unknown').replace(/"/g, '""')}"`,
-      `"${(a.profile?.email || '').replace(/"/g, '""')}"`,
-      `"${(a.jobTitle || '').replace(/"/g, '""')}"`,
-      `"${(a.company || '').replace(/"/g, '""')}"`,
-      `"${(statusLabels[a.status] || a.status).replace(/"/g, '""')}"`,
-      `"${new Date(a.createdAt).toLocaleDateString()}"`,
-      `"${(a.profile?.city || '').replace(/"/g, '""')}"`,
-      `"${(a.profile?.country || '').replace(/"/g, '""')}"`,
-      `"${(a.profile?.education || '').replace(/"/g, '""')}"`,
-      `"${(a.profile?.skills || []).join('; ').replace(/"/g, '""')}"`,
-      `"${(a.notes || '').replace(/"/g, '""')}"`,
-      `"${a.rating || ''}"`
-    ]);
-
-    const csvContent = 'data:text/csv;charset=utf-8,' + [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
-    const encodedUri = encodeURI(csvContent);
-    const link = document.createElement('a');
-    link.setAttribute('href', encodedUri);
-    link.setAttribute('download', `hireease_candidates_${new Date().toISOString().slice(0, 10)}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    toast.success(`Exported ${filteredApplications.length} candidates to CSV.`);
-  }
 
   // Status Badge Helper
   function renderStatusPill(status: string) {
@@ -407,7 +510,7 @@ export default function Admin({ email }: { email: string }) {
     if (st === 'approved' || st === 'selected') {
       return (
         <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-emerald-50 text-emerald-800 border border-emerald-200">
-          <CheckCircle2 size={13} className="text-emerald-600" /> Approved
+          <CheckCircle2 size={13} className="text-emerald-600" /> Selected / Approved
         </span>
       );
     }
@@ -418,10 +521,10 @@ export default function Admin({ email }: { email: string }) {
         </span>
       );
     }
-    if (st === 'interview_done') {
+    if (st === 'interview_completed' || st === 'interview_done') {
       return (
         <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-purple-50 text-purple-800 border border-purple-200">
-          🎙️ Interview Done
+          🎙️ Interview Completed
         </span>
       );
     }
@@ -429,6 +532,41 @@ export default function Admin({ email }: { email: string }) {
       return (
         <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-indigo-50 text-indigo-800 border border-indigo-200">
           📅 Interview Scheduled
+        </span>
+      );
+    }
+    if (st === 'assessment') {
+      return (
+        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-violet-50 text-violet-800 border border-violet-200">
+          🧠 Assessment
+        </span>
+      );
+    }
+    if (st === 'submitted') {
+      return (
+        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-teal-50 text-teal-800 border border-teal-200">
+          📝 Application Submitted
+        </span>
+      );
+    }
+    if (st === 'awaiting_confirmation') {
+      return (
+        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-amber-50 text-amber-800 border border-amber-200">
+          ⏳ Awaiting External Confirmation
+        </span>
+      );
+    }
+    if (st === 'redirected') {
+      return (
+        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-cyan-50 text-cyan-800 border border-cyan-200">
+          ↗️ Redirected
+        </span>
+      );
+    }
+    if (st === 'clicked_apply') {
+      return (
+        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-blue-50 text-blue-800 border border-blue-200">
+          🔗 Clicked Apply
         </span>
       );
     }
@@ -447,8 +585,8 @@ export default function Admin({ email }: { email: string }) {
       );
     }
     return (
-      <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-amber-50 text-amber-800 border border-amber-200">
-        ⏳ Pending
+      <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-gray-50 text-gray-700 border border-gray-200">
+        ⏳ {statusLabels[st] || st}
       </span>
     );
   }
@@ -511,12 +649,6 @@ export default function Admin({ email }: { email: string }) {
             {data && (
               <div className="flex items-center gap-3 flex-wrap">
                 <button
-                  onClick={exportCandidatesCSV}
-                  className="px-4 py-2.5 bg-[#233324] hover:bg-[#2c402d] text-white border border-[#3b533a] rounded-xl text-xs font-bold transition flex items-center gap-2 shadow-xs"
-                >
-                  <Download size={15} className="text-[#c4f568]" /> Export Candidates CSV
-                </button>
-                <button
                   onClick={() => edit('new')}
                   className="px-5 py-2.5 bg-[#c4f568] hover:bg-[#b2eb52] text-[#182319] rounded-xl text-xs font-bold transition flex items-center gap-2 shadow-sm font-semibold"
                 >
@@ -529,34 +661,33 @@ export default function Admin({ email }: { email: string }) {
 
         {loading ? (
           <Skeleton className="h-96 w-full rounded-2xl" />
+        ) : error && !data ? (
+          <section className="bg-white border border-rose-200 rounded-2xl p-8 max-w-xl mx-auto shadow-sm text-center">
+            <AlertCircle size={40} className="text-rose-600 mx-auto mb-3" />
+            <h2 className="text-xl font-bold text-[#182319] mb-2">Unable to Load Recruiter Workspace</h2>
+            <p className="text-xs text-rose-700 mb-6 bg-rose-50 p-3 rounded-xl border border-rose-100">
+              {error}
+            </p>
+            <button
+              onClick={() => { setLoading(true); load(); }}
+              className="px-6 py-2.5 bg-[#182319] hover:bg-[#2b421e] text-[#c4f568] font-bold text-xs rounded-xl transition shadow-xs"
+            >
+              Retry Loading
+            </button>
+          </section>
         ) : !data ? (
           <section className="bg-white border border-[#dce5d4] rounded-2xl p-8 max-w-xl mx-auto shadow-sm text-center">
             <ShieldCheck size={40} className="text-[#2e5c17] mx-auto mb-4" />
-            <h2 className="text-xl font-bold text-[#182319] mb-2">Activate your recruiter workspace</h2>
+            <h2 className="text-xl font-bold text-[#182319] mb-2">Connecting to Recruiter Workspace</h2>
             <p className="text-xs text-gray-500 mb-6">
-              Only authorized recruiters can manage jobs or view candidate details. Use the one-time setup code.
+              Synchronizing verified ATS applications, talent pipeline, and administrator credentials.
             </p>
-            <form onSubmit={activate} className="space-y-4 text-left">
-              <div>
-                <label className="block text-xs font-bold text-gray-700 mb-1">Workspace setup code</label>
-                <input
-                  type="password"
-                  autoComplete="off"
-                  required
-                  value={setup}
-                  onChange={e => setSetup(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#2e5c17]"
-                />
-              </div>
-              {error && <p className="text-xs text-red-600">{error}</p>}
-              <button
-                type="submit"
-                disabled={saving}
-                className="w-full py-2.5 bg-[#182319] hover:bg-[#2e5c17] text-[#c4f568] font-bold text-xs rounded-xl transition shadow-xs"
-              >
-                {saving ? 'Activating…' : 'Activate Workspace'}
-              </button>
-            </form>
+            <button
+              onClick={() => { setLoading(true); load(); }}
+              className="px-6 py-2.5 bg-[#182319] hover:bg-[#2b421e] text-[#c4f568] font-bold text-xs rounded-xl transition shadow-xs cursor-pointer"
+            >
+              Refresh Workspace
+            </button>
           </section>
         ) : (
           <>
@@ -577,73 +708,73 @@ export default function Admin({ email }: { email: string }) {
               </div>
 
               <div
-                onClick={() => setStatusFilter('pending')}
-                className={`bg-white border rounded-2xl p-4 cursor-pointer transition shadow-xs hover:border-amber-400 ${
-                  statusFilter === 'pending' ? 'border-amber-500 ring-2 ring-amber-500/10' : 'border-[#dce5d4]'
-                }`}
-              >
-                <div className="flex items-center justify-between text-amber-700 mb-1">
-                  <span className="text-[11px] font-bold uppercase tracking-wider">Pending</span>
-                  <Clock size={16} />
-                </div>
-                <div className="text-2xl font-extrabold text-amber-700">{metrics.pending}</div>
-                <div className="text-[11px] text-gray-500">Needs screening</div>
-              </div>
-
-              <div
-                onClick={() => setStatusFilter('review')}
+                onClick={() => setStatusFilter('clicked_apply')}
                 className={`bg-white border rounded-2xl p-4 cursor-pointer transition shadow-xs hover:border-sky-400 ${
-                  statusFilter === 'review' ? 'border-sky-500 ring-2 ring-sky-500/10' : 'border-[#dce5d4]'
+                  statusFilter === 'clicked_apply' ? 'border-sky-500 ring-2 ring-sky-500/10' : 'border-[#dce5d4]'
                 }`}
               >
                 <div className="flex items-center justify-between text-sky-700 mb-1">
-                  <span className="text-[11px] font-bold uppercase tracking-wider">Review</span>
-                  <Search size={16} />
+                  <span className="text-[11px] font-bold uppercase tracking-wider">Clicked Apply</span>
+                  <ExternalLink size={16} />
                 </div>
-                <div className="text-2xl font-extrabold text-sky-700">{metrics.review}</div>
-                <div className="text-[11px] text-gray-500">In evaluation</div>
+                <div className="text-2xl font-extrabold text-sky-700">{metrics.clickedApply}</div>
+                <div className="text-[11px] text-gray-500">Redirected to link</div>
+              </div>
+
+              <div
+                onClick={() => setStatusFilter('awaiting_confirmation')}
+                className={`bg-white border rounded-2xl p-4 cursor-pointer transition shadow-xs hover:border-amber-400 ${
+                  statusFilter === 'awaiting_confirmation' ? 'border-amber-500 ring-2 ring-amber-500/10' : 'border-[#dce5d4]'
+                }`}
+              >
+                <div className="flex items-center justify-between text-amber-700 mb-1">
+                  <span className="text-[11px] font-bold uppercase tracking-wider">Awaiting Conf</span>
+                  <Clock size={16} />
+                </div>
+                <div className="text-2xl font-extrabold text-amber-700">{metrics.awaitingConfirmation}</div>
+                <div className="text-[11px] text-gray-500">External pending</div>
+              </div>
+
+              <div
+                onClick={() => setStatusFilter('assessment')}
+                className={`bg-white border rounded-2xl p-4 cursor-pointer transition shadow-xs hover:border-purple-400 ${
+                  statusFilter === 'assessment' ? 'border-purple-500 ring-2 ring-purple-500/10' : 'border-[#dce5d4]'
+                }`}
+              >
+                <div className="flex items-center justify-between text-purple-700 mb-1">
+                  <span className="text-[11px] font-bold uppercase tracking-wider">Assessment</span>
+                  <Sparkles size={16} />
+                </div>
+                <div className="text-2xl font-extrabold text-purple-700">{metrics.assessment}</div>
+                <div className="text-[11px] text-gray-500">Online test stage</div>
               </div>
 
               <div
                 onClick={() => setStatusFilter('interview')}
-                className={`bg-white border rounded-2xl p-4 cursor-pointer transition shadow-xs hover:border-purple-400 ${
-                  statusFilter === 'interview' ? 'border-purple-500 ring-2 ring-purple-500/10' : 'border-[#dce5d4]'
+                className={`bg-white border rounded-2xl p-4 cursor-pointer transition shadow-xs hover:border-indigo-400 ${
+                  statusFilter === 'interview' ? 'border-indigo-500 ring-2 ring-indigo-500/10' : 'border-[#dce5d4]'
                 }`}
               >
-                <div className="flex items-center justify-between text-purple-700 mb-1">
+                <div className="flex items-center justify-between text-indigo-700 mb-1">
                   <span className="text-[11px] font-bold uppercase tracking-wider">Interviews</span>
                   <Calendar size={16} />
                 </div>
-                <div className="text-2xl font-extrabold text-purple-700">{metrics.interview}</div>
+                <div className="text-2xl font-extrabold text-indigo-700">{metrics.interview}</div>
                 <div className="text-[11px] text-gray-500">Scheduled / Done</div>
               </div>
 
               <div
-                onClick={() => setStatusFilter('approved')}
+                onClick={() => setStatusFilter('selected')}
                 className={`bg-white border rounded-2xl p-4 cursor-pointer transition shadow-xs hover:border-emerald-400 ${
-                  statusFilter === 'approved' ? 'border-emerald-500 ring-2 ring-emerald-500/10' : 'border-[#dce5d4]'
+                  statusFilter === 'selected' ? 'border-emerald-500 ring-2 ring-emerald-500/10' : 'border-[#dce5d4]'
                 }`}
               >
                 <div className="flex items-center justify-between text-emerald-700 mb-1">
-                  <span className="text-[11px] font-bold uppercase tracking-wider">Approved</span>
+                  <span className="text-[11px] font-bold uppercase tracking-wider">Selected</span>
                   <CheckCircle2 size={16} />
                 </div>
-                <div className="text-2xl font-extrabold text-emerald-700">{metrics.approved}</div>
-                <div className="text-[11px] text-gray-500">Email sent</div>
-              </div>
-
-              <div
-                onClick={() => setStatusFilter('hired')}
-                className={`bg-white border rounded-2xl p-4 cursor-pointer transition shadow-xs hover:border-[#2e5c17] ${
-                  statusFilter === 'hired' ? 'border-[#2e5c17] ring-2 ring-[#2e5c17]/10' : 'border-[#dce5d4]'
-                }`}
-              >
-                <div className="flex items-center justify-between text-[#2e5c17] mb-1">
-                  <span className="text-[11px] font-bold uppercase tracking-wider">Hired</span>
-                  <Sparkles size={16} className="text-[#2e5c17]" />
-                </div>
-                <div className="text-2xl font-extrabold text-[#182319]">{metrics.hired}</div>
-                <div className="text-[11px] text-gray-500">Selected & active</div>
+                <div className="text-2xl font-extrabold text-emerald-700">{metrics.selected}</div>
+                <div className="text-[11px] text-gray-500">Hired / Offered</div>
               </div>
             </div>
 
@@ -667,6 +798,12 @@ export default function Admin({ email }: { email: string }) {
                   className="data-[state=active]:bg-[#182319] data-[state=active]:text-[#c4f568] text-gray-700 font-bold text-xs px-4 py-2 rounded-xl transition"
                 >
                   Job Openings ({data.jobs.length})
+                </TabsTrigger>
+                <TabsTrigger
+                  value="inhouse"
+                  className="data-[state=active]:bg-[#182319] data-[state=active]:text-[#c4f568] text-gray-700 font-bold text-xs px-4 py-2 rounded-xl transition"
+                >
+                  In-House Projects ({inhouseProjects.length})
                 </TabsTrigger>
                 <TabsTrigger
                   value="approvals"
@@ -693,54 +830,64 @@ export default function Admin({ email }: { email: string }) {
                       All ({metrics.total})
                     </button>
                     <button
-                      onClick={() => setStatusFilter('pending')}
+                      onClick={() => setStatusFilter('clicked_apply')}
                       className={`px-3 py-1.5 rounded-xl whitespace-nowrap transition ${
-                        statusFilter === 'pending'
+                        statusFilter === 'clicked_apply'
+                          ? 'bg-sky-700 text-white'
+                          : 'bg-sky-50 text-sky-800 hover:bg-sky-100'
+                      }`}
+                    >
+                      🔗 Clicked Apply ({metrics.clickedApply})
+                    </button>
+                    <button
+                      onClick={() => setStatusFilter('awaiting_confirmation')}
+                      className={`px-3 py-1.5 rounded-xl whitespace-nowrap transition ${
+                        statusFilter === 'awaiting_confirmation'
                           ? 'bg-amber-600 text-white'
                           : 'bg-amber-50 text-amber-800 hover:bg-amber-100'
                       }`}
                     >
-                      ⏳ Pending ({metrics.pending})
+                      ⏳ Awaiting Conf ({metrics.awaitingConfirmation})
                     </button>
                     <button
-                      onClick={() => setStatusFilter('review')}
+                      onClick={() => setStatusFilter('submitted')}
                       className={`px-3 py-1.5 rounded-xl whitespace-nowrap transition ${
-                        statusFilter === 'review'
-                          ? 'bg-sky-600 text-white'
-                          : 'bg-sky-50 text-sky-800 hover:bg-sky-100'
+                        statusFilter === 'submitted'
+                          ? 'bg-blue-600 text-white'
+                          : 'bg-blue-50 text-blue-800 hover:bg-blue-100'
                       }`}
                     >
-                      🔍 Under Review ({metrics.review})
+                      📝 Submitted ({metrics.submitted})
+                    </button>
+                    <button
+                      onClick={() => setStatusFilter('assessment')}
+                      className={`px-3 py-1.5 rounded-xl whitespace-nowrap transition ${
+                        statusFilter === 'assessment'
+                          ? 'bg-purple-600 text-white'
+                          : 'bg-purple-50 text-purple-800 hover:bg-purple-100'
+                      }`}
+                    >
+                      🧠 Assessment ({metrics.assessment})
                     </button>
                     <button
                       onClick={() => setStatusFilter('interview')}
                       className={`px-3 py-1.5 rounded-xl whitespace-nowrap transition ${
                         statusFilter === 'interview'
-                          ? 'bg-purple-600 text-white'
-                          : 'bg-purple-50 text-purple-800 hover:bg-purple-100'
+                          ? 'bg-indigo-600 text-white'
+                          : 'bg-indigo-50 text-indigo-800 hover:bg-indigo-100'
                       }`}
                     >
-                      🎙️ Interview Done / Sched ({metrics.interview})
+                      🎙️ Interview ({metrics.interview})
                     </button>
                     <button
-                      onClick={() => setStatusFilter('approved')}
+                      onClick={() => setStatusFilter('selected')}
                       className={`px-3 py-1.5 rounded-xl whitespace-nowrap transition ${
-                        statusFilter === 'approved'
+                        statusFilter === 'selected'
                           ? 'bg-emerald-600 text-white'
                           : 'bg-emerald-50 text-emerald-800 hover:bg-emerald-100'
                       }`}
                     >
-                      ✅ Approved ({metrics.approved})
-                    </button>
-                    <button
-                      onClick={() => setStatusFilter('hired')}
-                      className={`px-3 py-1.5 rounded-xl whitespace-nowrap transition ${
-                        statusFilter === 'hired'
-                          ? 'bg-[#182319] text-[#c4f568]'
-                          : 'bg-[#edf7e3] text-[#2e5c17] hover:bg-[#e0f0d2]'
-                      }`}
-                    >
-                      🎉 Hired ({metrics.hired})
+                      🎉 Selected / Hired ({metrics.selected})
                     </button>
                     <button
                       onClick={() => setStatusFilter('rejected')}
@@ -775,7 +922,7 @@ export default function Admin({ email }: { email: string }) {
                       )}
                     </div>
 
-                    <div className="sm:col-span-4">
+                    <div className="sm:col-span-6">
                       <Select value={roleFilter} onValueChange={setRoleFilter}>
                         <SelectTrigger className="w-full text-xs h-9 sm:h-10 rounded-xl bg-gray-50 border-gray-200">
                           <SelectValue placeholder="Filter by Job Role" />
@@ -789,16 +936,6 @@ export default function Admin({ email }: { email: string }) {
                           ))}
                         </SelectContent>
                       </Select>
-                    </div>
-
-                    <div className="sm:col-span-2 flex items-center justify-end">
-                      <button
-                        onClick={exportCandidatesCSV}
-                        className="w-full h-9 sm:h-10 px-3 bg-gray-100 hover:bg-gray-200 text-gray-800 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5"
-                        title="Download CSV report of filtered candidates"
-                      >
-                        <Download size={14} /> Export CSV
-                      </button>
                     </div>
                   </div>
 
@@ -873,8 +1010,10 @@ export default function Admin({ email }: { email: string }) {
                                   </span>
                                   <span className="text-xs text-gray-400">·</span>
                                   <span className="text-xs font-semibold text-gray-700">{a.jobTitle}</span>
-                                  <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-gray-100 text-gray-600 border border-gray-200">
-                                    {a.company || 'Partner'}
+                                  <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-white text-gray-700 border border-gray-200 flex items-center gap-1 shadow-2xs">
+                                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                                    <img src={getCompanyLogo(a.company)} alt={a.company || 'Partner'} className="w-3.5 h-3.5 object-contain rounded-full" />
+                                    <span>{getCompanyDisplayName(a.company)}</span>
                                   </span>
                                   {a.isSample && (
                                     <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-200">
@@ -978,6 +1117,8 @@ export default function Admin({ email }: { email: string }) {
 
                               <a
                                 href={'/api/resume?application=' + a.id}
+                                target="_blank"
+                                rel="noopener noreferrer"
                                 className="px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl text-xs font-bold transition flex items-center gap-1.5"
                                 title="Download submitted PDF resume"
                               >
@@ -1109,6 +1250,8 @@ export default function Admin({ email }: { email: string }) {
                           {c.hasResume && (
                             <a
                               href={'/api/resume?candidate=' + encodeURIComponent(c.userId)}
+                              target="_blank"
+                              rel="noopener noreferrer"
                               className="font-bold text-gray-600 hover:text-[#182319] flex items-center gap-1"
                             >
                               <Download size={13} /> Download CV
@@ -1161,8 +1304,10 @@ export default function Admin({ email }: { email: string }) {
                       >
                         <div>
                           <div className="flex items-center gap-2 mb-1">
-                            <span className="text-[10px] font-bold uppercase tracking-wider text-[#2e5c17] bg-[#edf7e3] px-2 py-0.5 rounded-md">
-                              {j.company}
+                            <span className="text-[10px] font-bold uppercase tracking-wider text-[#2e5c17] bg-[#edf7e3] px-2 py-0.5 rounded-md flex items-center gap-1.5 border border-[#d2ebd5]">
+                              {/* eslint-disable-next-line @next/next/no-img-element */}
+                              <img src={getCompanyLogo(j.company)} alt={j.company} className="w-3.5 h-3.5 object-contain rounded-full bg-white shrink-0" />
+                              <span>{getCompanyDisplayName(j.company)}</span>
                             </span>
                             <span
                               className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded-md ${
@@ -1226,51 +1371,79 @@ export default function Admin({ email }: { email: string }) {
 
                 {/* Authorized Admins List */}
                 <div className="bg-white border border-[#dce5d4] rounded-2xl p-6 shadow-xs space-y-4">
-                  <h3 className="text-sm font-bold text-[#182319]">Active Administrators</h3>
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <div>
+                      <h3 className="text-sm font-bold text-[#182319]">Active Administrators</h3>
+                      <p className="text-xs text-gray-500">Manage recruiter and administrator privileges for team members.</p>
+                    </div>
+                    {isSuperAdminUser && (
+                      <button
+                        onClick={() => setAddAdminModalOpen(true)}
+                        className="px-4 py-2 bg-[#182319] hover:bg-[#2b421e] text-[#c4f568] text-xs font-bold rounded-xl flex items-center gap-1.5 transition shadow-xs self-start sm:self-auto cursor-pointer"
+                      >
+                        <UserPlus size={15} /> Add New Admin
+                      </button>
+                    )}
+                  </div>
+
                   <div className="space-y-3">
-                    {accessData?.admins && accessData.admins.length > 0 ? (
-                      accessData.admins.map((adm: any) => {
-                        const isSuper = adm.email?.toLowerCase() === email.toLowerCase();
+                    {((accessData?.admins && accessData.admins.length > 0)
+                      ? accessData.admins
+                      : [{ id: 'super-root', name: 'saurabh ojha', email: email || 'saurabho7222@gmail.com', role: 'admin' }]
+                    ).map((adm: any) => {
+                        const isSuper = (adm.email?.toLowerCase() === email?.toLowerCase()) || (adm.email?.toLowerCase() === 'saurabho7222@gmail.com');
+                        const role = adm.role || 'admin';
                         return (
                           <div
                             key={adm.id}
-                            className="flex items-center justify-between p-3.5 bg-gray-50 rounded-xl border border-gray-200"
+                            className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3.5 bg-gray-50 rounded-xl border border-gray-200"
                           >
                             <div className="flex items-center gap-3">
-                              <UserCheck size={18} className={isSuper ? 'text-[#2e5c17]' : 'text-blue-600'} />
+                              <UserCheck size={18} className={isSuper ? 'text-[#2e5c17]' : role === 'recruiter' ? 'text-purple-600' : 'text-blue-600'} />
                               <div>
                                 <strong className="text-xs font-bold text-gray-900">{adm.name}</strong>
                                 <div className="text-[11px] text-gray-500">{adm.email}</div>
                               </div>
                             </div>
 
-                            <div className="flex items-center gap-2">
+                            <div className="flex items-center gap-2 flex-wrap">
                               {isSuper ? (
                                 <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-[#182319] text-[#c4f568]">
                                   Super Admin (You)
                                 </span>
                               ) : (
                                 <>
-                                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-200">
-                                    Approved Admin
+                                  <span className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full border ${
+                                    role === 'recruiter'
+                                      ? 'bg-purple-50 text-purple-800 border-purple-200'
+                                      : 'bg-blue-50 text-blue-800 border-blue-200'
+                                  }`}>
+                                    {role === 'recruiter' ? 'Recruiter' : 'Administrator'}
                                   </span>
-                                  {accessData?.isSuperAdmin && (
-                                    <button
-                                      onClick={() => handleAdminAccessAction(adm.id, 'revoke')}
-                                      className="text-xs text-rose-600 font-bold hover:underline"
-                                    >
-                                      Revoke
-                                    </button>
+
+                                  {isSuperAdminUser && (
+                                    <>
+                                      <button
+                                        onClick={() => handleChangeAdminRole(adm.id, role === 'admin' ? 'recruiter' : 'admin')}
+                                        className="text-xs text-gray-600 hover:text-gray-900 font-semibold px-2 py-1 bg-white border border-gray-200 rounded-lg hover:bg-gray-100 transition"
+                                        title={`Switch role to ${role === 'admin' ? 'Recruiter' : 'Administrator'}`}
+                                      >
+                                        Change to {role === 'admin' ? 'Recruiter' : 'Admin'}
+                                      </button>
+                                      <button
+                                        onClick={() => handleAdminAccessAction(adm.id, 'revoke')}
+                                        className="text-xs text-rose-600 font-bold hover:underline px-2 py-1"
+                                      >
+                                        Revoke
+                                      </button>
+                                    </>
                                   )}
                                 </>
                               )}
                             </div>
                           </div>
                         );
-                      })
-                    ) : (
-                      <p className="text-xs text-gray-500">No administrators registered.</p>
-                    )}
+                      })}
                   </div>
                 </div>
 
@@ -1289,20 +1462,22 @@ export default function Admin({ email }: { email: string }) {
                             <div className="text-[11px] text-gray-500">{req.email}</div>
                             <p className="text-xs text-gray-600 mt-1 italic">&quot;{req.reason}&quot;</p>
                           </div>
-                          <div className="flex items-center gap-2">
-                            <button
-                              onClick={() => handleAdminAccessAction(req.user_id, 'grant')}
-                              className="px-3 py-1.5 bg-[#182319] text-[#c4f568] rounded-xl text-xs font-bold transition"
-                            >
-                              Approve Admin
-                            </button>
-                            <button
-                              onClick={() => handleAdminAccessAction(req.user_id, 'revoke')}
-                              className="px-3 py-1.5 bg-rose-50 text-rose-700 rounded-xl text-xs font-bold transition"
-                            >
-                              Reject
-                            </button>
-                          </div>
+                          {isSuperAdminUser && (
+                            <div className="flex items-center gap-2">
+                              <button
+                                onClick={() => handleAdminAccessAction(req.user_id, 'grant')}
+                                className="px-3 py-1.5 bg-[#182319] text-[#c4f568] rounded-xl text-xs font-bold transition cursor-pointer"
+                              >
+                                Approve Admin
+                              </button>
+                              <button
+                                onClick={() => handleAdminAccessAction(req.user_id, 'revoke')}
+                                className="px-3 py-1.5 bg-rose-50 text-rose-700 rounded-xl text-xs font-bold transition cursor-pointer"
+                              >
+                                Reject
+                              </button>
+                            </div>
+                          )}
                         </div>
                       ))}
                     </div>
@@ -1312,6 +1487,172 @@ export default function Admin({ email }: { email: string }) {
                     </div>
                   )}
                 </div>
+
+                {/* Admin Activity & Audit Logs */}
+                <div className="bg-white border border-[#dce5d4] rounded-2xl p-6 shadow-xs space-y-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h3 className="text-sm font-bold text-[#182319]">Admin Activity & Audit Trail</h3>
+                      <p className="text-xs text-gray-500">Security record of role modifications, admin additions, and status updates.</p>
+                    </div>
+                    <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-gray-100 text-gray-700 border border-gray-200">
+                      {accessData?.auditLogs?.length || 0} Events Logged
+                    </span>
+                  </div>
+
+                  {accessData?.auditLogs && accessData.auditLogs.length > 0 ? (
+                    <div className="divide-y divide-gray-100 max-h-72 overflow-y-auto pr-1">
+                      {accessData.auditLogs.map((log: any) => (
+                        <div key={log.id} className="py-2.5 flex items-start justify-between text-xs gap-3">
+                          <div className="space-y-0.5">
+                            <div className="font-semibold text-gray-900 flex items-center gap-2 flex-wrap">
+                              <span className="px-1.5 py-0.5 rounded text-[10px] font-bold uppercase bg-gray-100 text-gray-700">
+                                {log.action.replace(/_/g, ' ')}
+                              </span>
+                              <span>{log.actor_email}</span>
+                            </div>
+                            <div className="text-gray-500 text-[11px]">
+                              Target: <strong>{log.target_email || 'System'}</strong>
+                              {log.details ? ` · ${log.details}` : ''}
+                            </div>
+                          </div>
+                          <div className="text-[11px] text-gray-400 whitespace-nowrap">
+                            {new Date(log.created_at).toLocaleString('en-IN', { dateStyle: 'short', timeStyle: 'short' })}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-xs text-gray-500 text-center py-4">No administrative audit events recorded yet.</p>
+                  )}
+                </div>
+              </TabsContent>
+
+              {/* TAB 5: IN-HOUSE CLIENT PROJECTS */}
+              <TabsContent value="inhouse" className="space-y-6">
+                <div className="bg-white border border-[#dce5d4] rounded-2xl p-6 shadow-xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <Sparkles size={18} className="text-[#2e5c17]" />
+                      <h2 className="text-base font-extrabold text-[#182319]">
+                        HireEase Managed In-House Projects
+                      </h2>
+                    </div>
+                    <p className="text-xs text-gray-500 mt-1 max-w-xl">
+                      Direct client engagements managed in-house. These appear exclusively on the candidate portal with guaranteed direct payouts and verified hours.
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => setAddInhouseModalOpen(true)}
+                    className="px-4 py-2.5 bg-[#c4f568] hover:bg-[#b2e553] text-[#152113] border border-[#a8df43] rounded-xl text-xs font-extrabold transition flex items-center gap-2 shadow-2xs cursor-pointer shrink-0"
+                  >
+                    <Plus size={15} />
+                    <span>Add In-House Project</span>
+                  </button>
+                </div>
+
+                {inhouseProjects.length === 0 ? (
+                  <div className="bg-white border border-dashed border-[#dce5d4] rounded-2xl p-10 text-center">
+                    <div className="w-12 h-12 rounded-2xl bg-[#edf7e3] text-[#2e5c17] flex items-center justify-center mx-auto mb-3 border border-[#d2ebd5]">
+                      <Briefcase size={22} />
+                    </div>
+                    <h3 className="text-base font-bold text-gray-900 mb-1">No In-House Projects Published</h3>
+                    <p className="text-xs text-gray-500 max-w-md mx-auto mb-4">
+                      Create your first managed client delivery project. Candidates in the talent pool will be able to review requirements and apply directly.
+                    </p>
+                    <button
+                      onClick={() => setAddInhouseModalOpen(true)}
+                      className="px-5 py-2.5 bg-[#c4f568] hover:bg-[#b2e553] text-[#152113] border border-[#a8df43] rounded-xl text-xs font-extrabold transition shadow-xs cursor-pointer inline-flex items-center gap-2"
+                    >
+                      <Plus size={15} /> Add First In-House Project
+                    </button>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+                    {inhouseProjects.map(proj => (
+                      <div
+                        key={proj.id}
+                        className="bg-white border border-[#dce5d4] hover:border-[#77ab3b] rounded-2xl p-5 shadow-xs hover:shadow-md transition flex flex-col justify-between"
+                      >
+                        <div>
+                          <div className="flex items-center justify-between gap-2 mb-2 flex-wrap">
+                            <span className="text-xs font-bold bg-[#edf7e3] text-[#2e5c17] border border-[#d2ebd5] px-2.5 py-0.5 rounded-full flex items-center gap-1">
+                              <Sparkles size={11} /> {proj.domain || 'In-House'}
+                            </span>
+                            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-200 uppercase tracking-wider">
+                              {proj.status || 'open'}
+                            </span>
+                          </div>
+
+                          <h3 className="text-base font-bold text-gray-900 mb-1 line-clamp-2">
+                            {proj.title}
+                          </h3>
+                          <div className="text-xs font-semibold text-gray-500 mb-2">
+                            Client: <span className="text-gray-800">{proj.client}</span>
+                          </div>
+
+                          <p className="text-xs text-gray-600 line-clamp-3 mb-3 leading-relaxed">
+                            {proj.description}
+                          </p>
+
+                          <div className="flex items-center gap-2 text-xs text-gray-700 mb-3 flex-wrap">
+                            <span className="font-extrabold text-[#182319] bg-[#f2f8ee] px-2 py-0.5 rounded border border-[#d2ebd5]">
+                              {proj.payout}
+                            </span>
+                            <span className="text-gray-500 flex items-center gap-1 text-[11px]">
+                              <Clock size={11} /> {proj.estimatedHours}
+                            </span>
+                            <span className="text-gray-500 flex items-center gap-1 text-[11px]">
+                              <Calendar size={11} /> {proj.duration}
+                            </span>
+                          </div>
+
+                          {proj.requiredSkills && proj.requiredSkills.length > 0 && (
+                            <div className="flex items-center gap-1.5 flex-wrap mb-3">
+                              {proj.requiredSkills.slice(0, 3).map(skill => (
+                                <span
+                                  key={skill}
+                                  className="text-[10px] font-medium bg-gray-50 text-gray-600 border border-gray-200 px-2 py-0.5 rounded truncate"
+                                >
+                                  {skill}
+                                </span>
+                              ))}
+                              {proj.requiredSkills.length > 3 && (
+                                <span className="text-[9px] font-bold text-gray-400 bg-gray-100 px-1.5 py-0.5 rounded">
+                                  +{proj.requiredSkills.length - 3}
+                                </span>
+                              )}
+                            </div>
+                          )}
+                        </div>
+
+                        <div className="pt-3 border-t border-gray-100 flex items-center justify-between gap-2 mt-auto">
+                          <button
+                            onClick={() => {
+                              navigator.clipboard.writeText(`https://hireeaseservices.com/dashboard?project=${proj.id}`);
+                              toast.success('Project candidate portal URL copied!');
+                            }}
+                            className="p-2 border border-gray-200 hover:bg-gray-50 text-gray-600 rounded-xl transition cursor-pointer text-xs flex items-center gap-1 font-semibold"
+                            title="Copy link"
+                          >
+                            <Copy size={13} />
+                            <span>Copy link</span>
+                          </button>
+
+                          <button
+                            onClick={() => handleDeleteInhouseProject(proj.id)}
+                            disabled={deletingInhouseId === proj.id}
+                            className="p-2 border border-rose-200 bg-rose-50/50 hover:bg-rose-100 text-rose-700 rounded-xl transition cursor-pointer text-xs flex items-center gap-1 font-semibold disabled:opacity-50"
+                            title="Delete project"
+                          >
+                            <Trash2 size={13} />
+                            <span>{deletingInhouseId === proj.id ? 'Deleting...' : 'Delete'}</span>
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </TabsContent>
             </Tabs>
           </>
@@ -1546,7 +1887,7 @@ export default function Admin({ email }: { email: string }) {
                   <div className="text-[11px] font-bold text-gray-400 uppercase mb-1">Application Status</div>
                   <Select
                     value={selectedApplication.status}
-                    onValueChange={v => update(selectedApplication, v, evalNotes, evalRating)}
+                    onValueChange={v => update(selectedApplication, v, evalNotes, evalRating, false, interviewDateInput)}
                   >
                     <SelectTrigger className="w-44 text-xs font-bold h-9 rounded-xl">
                       <SelectValue />
@@ -1612,6 +1953,61 @@ export default function Admin({ email }: { email: string }) {
                 </div>
               </div>
 
+              {/* Platform & Referral Link (if tracked external application) */}
+              {selectedApplication.externalUrl && (
+                <div className="bg-emerald-50/60 border border-emerald-200 rounded-xl p-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs">
+                  <div className="flex items-center gap-2">
+                    <Globe size={15} className="text-[#2e5c17]" />
+                    <span className="text-gray-700">
+                      Platform Application Link (<strong>{selectedApplication.platform || selectedApplication.company || 'External'}</strong>):
+                    </span>
+                  </div>
+                  <a
+                    href={selectedApplication.externalUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-[#2e5c17] hover:underline font-bold inline-flex items-center gap-1 shrink-0"
+                  >
+                    Open Platform Application <ExternalLink size={12} />
+                  </a>
+                </div>
+              )}
+
+              {/* Candidate Application Progression & Status History */}
+              {selectedApplication.statusHistory && selectedApplication.statusHistory.length > 0 && (
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <h4 className="text-xs font-bold uppercase tracking-wider text-gray-500">
+                      Candidate Application Progression & Audit Trail
+                    </h4>
+                    <span className="text-[11px] font-semibold text-gray-400">
+                      {selectedApplication.statusHistory.length} events
+                    </span>
+                  </div>
+                  <div className="bg-gray-50 rounded-2xl border border-gray-200 p-3.5 space-y-2.5 max-h-48 overflow-y-auto">
+                    {selectedApplication.statusHistory.map((ev, idx) => (
+                      <div key={idx} className="flex items-start gap-2.5 text-xs">
+                        <div className="w-2 h-2 rounded-full bg-[#2e5c17] mt-1.5 shrink-0" />
+                        <div className="flex-1">
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="font-bold text-gray-900">
+                              {statusLabels[ev.status] || ev.status}
+                            </span>
+                            <span className="text-[10px] text-gray-400 whitespace-nowrap">
+                              {new Date(ev.timestamp).toLocaleString('en-IN', { dateStyle: 'short', timeStyle: 'short' })}
+                            </span>
+                          </div>
+                          <div className="text-[11px] text-gray-500">
+                            Recorded by <span className="font-semibold text-gray-700">{ev.actor}</span>
+                            {ev.note ? ` · "${ev.note}"` : ''}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               {/* Recruiter Evaluation & Internal Notes Box */}
               <div className="bg-[#f7faf3] p-5 rounded-2xl border border-[#dce5d4] space-y-3">
                 <div className="flex items-center justify-between">
@@ -1648,6 +2044,19 @@ export default function Admin({ email }: { email: string }) {
                   className="w-full p-3 bg-white border border-gray-200 rounded-xl text-xs text-gray-800 focus:outline-none focus:ring-2 focus:ring-[#2e5c17]"
                 />
 
+                {/* Interview Date Input */}
+                <div className="pt-1">
+                  <label className="text-[11px] font-bold text-gray-700 uppercase flex items-center gap-1.5 mb-1">
+                    <Calendar size={13} className="text-[#2e5c17]" /> Scheduled Interview Date / Time
+                  </label>
+                  <input
+                    type="datetime-local"
+                    value={interviewDateInput}
+                    onChange={e => setInterviewDateInput(e.target.value)}
+                    className="w-full sm:w-72 p-2 bg-white border border-gray-200 rounded-xl text-xs text-gray-800 focus:outline-none focus:ring-2 focus:ring-[#2e5c17]"
+                  />
+                </div>
+
                 <div className="flex items-center justify-between pt-1">
                   <span className="text-[11px] text-gray-500">
                     Internal only · Not visible to the candidate
@@ -1658,7 +2067,7 @@ export default function Admin({ email }: { email: string }) {
                     onClick={saveDossierNotes}
                     className="px-4 py-1.5 bg-[#182319] hover:bg-[#2e5c17] text-[#c4f568] rounded-xl text-xs font-bold transition shadow-2xs"
                   >
-                    {evalSaving ? 'Saving…' : 'Save Notes & Rating'}
+                    {evalSaving ? 'Saving…' : 'Save Notes & Interview'}
                   </button>
                 </div>
               </div>
@@ -1668,6 +2077,8 @@ export default function Admin({ email }: { email: string }) {
                 <div className="flex items-center gap-2">
                   <a
                     href={'/api/resume?application=' + selectedApplication.id}
+                    target="_blank"
+                    rel="noopener noreferrer"
                     className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-800 rounded-xl text-xs font-bold transition flex items-center gap-1.5"
                   >
                     <Download size={14} /> Download Submitted Résumé
@@ -1739,6 +2150,8 @@ export default function Admin({ email }: { email: string }) {
                   <div className="pt-2">
                     <a
                       href={'/api/resume?candidate=' + encodeURIComponent(candidate.userId)}
+                      target="_blank"
+                      rel="noopener noreferrer"
                       className="inline-flex items-center gap-1.5 px-4 py-2 bg-[#182319] text-[#c4f568] rounded-xl font-bold text-xs"
                     >
                       <Download size={14} /> Download Current Résumé
@@ -1748,6 +2161,220 @@ export default function Admin({ email }: { email: string }) {
               </div>
             </div>
           )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Add New Administrator Dialog */}
+      <Dialog open={addAdminModalOpen} onOpenChange={setAddAdminModalOpen}>
+        <DialogContent className="max-w-md bg-white rounded-3xl p-6 sm:p-8">
+          <DialogTitle className="text-xl font-bold text-[#182319] flex items-center gap-2">
+            <UserPlus size={20} className="text-[#2e5c17]" /> Add New Administrator
+          </DialogTitle>
+          <DialogDescription className="text-xs text-gray-500 mb-4">
+            Super Admin exclusive: grant administrative or recruiter privileges to a team member.
+          </DialogDescription>
+
+          <div className="space-y-4">
+            <div>
+              <label className="text-xs font-bold text-gray-700 block mb-1">Full Name</label>
+              <input
+                type="text"
+                required
+                placeholder="e.g. Priya Sharma"
+                value={newAdminName}
+                onChange={e => setNewAdminName(e.target.value)}
+                className="w-full px-3.5 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-xs text-gray-800 focus:outline-none focus:ring-2 focus:ring-[#2e5c17]"
+              />
+            </div>
+
+            <div>
+              <label className="text-xs font-bold text-gray-700 block mb-1">Email Address</label>
+              <input
+                type="email"
+                required
+                placeholder="colleague@hireeaseservices.com"
+                value={newAdminEmail}
+                onChange={e => setNewAdminEmail(e.target.value)}
+                className="w-full px-3.5 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-xs text-gray-800 focus:outline-none focus:ring-2 focus:ring-[#2e5c17]"
+              />
+            </div>
+
+            <div>
+              <label className="text-xs font-bold text-gray-700 block mb-1">Role & Permissions</label>
+              <Select value={newAdminRole} onValueChange={(v: 'admin' | 'recruiter') => setNewAdminRole(v)}>
+                <SelectTrigger className="w-full text-xs h-10 rounded-xl bg-gray-50 border-gray-200">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="admin" className="text-xs font-semibold">
+                    Administrator (Full ATS, jobs & candidate management)
+                  </SelectItem>
+                  <SelectItem value="recruiter" className="text-xs font-semibold">
+                    Recruiter (Screen candidates, interview updates & notes)
+                  </SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div>
+              <label className="text-xs font-bold text-gray-700 block mb-1">
+                Temporary Password <span className="text-gray-400 font-normal">(optional)</span>
+              </label>
+              <input
+                type="password"
+                placeholder="Leave blank for auto-generated secure token"
+                value={newAdminPassword}
+                onChange={e => setNewAdminPassword(e.target.value)}
+                className="w-full px-3.5 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-xs text-gray-800 focus:outline-none focus:ring-2 focus:ring-[#2e5c17]"
+              />
+            </div>
+
+            <div className="pt-2 flex items-center justify-end gap-2.5">
+              <button
+                type="button"
+                onClick={() => setAddAdminModalOpen(false)}
+                className="px-4 py-2 border border-gray-200 hover:bg-gray-50 text-gray-700 text-xs font-bold rounded-xl transition"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={isAddingAdmin}
+                onClick={handleCreateAdmin}
+                className="px-5 py-2 bg-[#c4f568] hover:bg-[#b2e553] text-[#152113] border border-[#a8df43] text-xs font-extrabold rounded-xl transition shadow-2xs flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+              >
+                {isAddingAdmin ? 'Adding...' : 'Add Administrator'}
+              </button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Add In-House Project Modal */}
+      <Dialog open={addInhouseModalOpen} onOpenChange={setAddInhouseModalOpen}>
+        <DialogContent className="max-w-2xl bg-white rounded-3xl p-6 sm:p-8 max-h-[90vh] overflow-y-auto">
+          <DialogTitle className="text-xl font-bold text-[#182319]">
+            Add New In-House Client Project
+          </DialogTitle>
+          <DialogDescription className="text-xs text-gray-500 mb-4">
+            Create an exclusive managed delivery project. It will be published directly to the candidate portal and home feed.
+          </DialogDescription>
+
+          <form onSubmit={handleCreateInhouseProject} className="space-y-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-xs font-bold text-gray-700 mb-1">Project Title *</label>
+                <input
+                  required
+                  placeholder="e.g. Multimodal Clinical Image & Report Validation"
+                  value={newInhouseTitle}
+                  onChange={e => setNewInhouseTitle(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-200 rounded-xl text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-[#2e5c17]"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-gray-700 mb-1">Client Name / Code *</label>
+                <input
+                  required
+                  placeholder="e.g. HireEase In-House Client #42 or Frontier Labs"
+                  value={newInhouseClient}
+                  onChange={e => setNewInhouseClient(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-200 rounded-xl text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-[#2e5c17]"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <div>
+                <label className="block text-xs font-bold text-gray-700 mb-1">Expertise Domain</label>
+                <select
+                  value={newInhouseDomain}
+                  onChange={e => setNewInhouseDomain(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-200 rounded-xl text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-[#2e5c17] bg-white"
+                >
+                  {categories.map(c => (
+                    <option key={c} value={c}>{c}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-gray-700 mb-1">Hourly Payout Rate *</label>
+                <input
+                  required
+                  placeholder="e.g. $85/hr or $60 - $80/hr"
+                  value={newInhousePayout}
+                  onChange={e => setNewInhousePayout(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-200 rounded-xl text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-[#2e5c17]"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-gray-700 mb-1">Estimated Hours</label>
+                <input
+                  required
+                  placeholder="e.g. 20-30 hrs/week"
+                  value={newInhouseHours}
+                  onChange={e => setNewInhouseHours(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-200 rounded-xl text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-[#2e5c17]"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-xs font-bold text-gray-700 mb-1">Project Duration</label>
+                <input
+                  required
+                  placeholder="e.g. 8 weeks or 3 months"
+                  value={newInhouseDuration}
+                  onChange={e => setNewInhouseDuration(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-200 rounded-xl text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-[#2e5c17]"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-gray-700 mb-1">Required Skills (Comma separated) *</label>
+                <input
+                  required
+                  placeholder="e.g. Clinical Review, Diagnostics, Medical Safety"
+                  value={newInhouseSkills}
+                  onChange={e => setNewInhouseSkills(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-200 rounded-xl text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-[#2e5c17]"
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold text-gray-700 mb-1">Project Scope & Description *</label>
+              <textarea
+                required
+                rows={4}
+                placeholder="Describe project responsibilities, evaluation criteria, and contributor expectations..."
+                value={newInhouseDescription}
+                onChange={e => setNewInhouseDescription(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-200 rounded-xl text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-[#2e5c17]"
+              />
+            </div>
+
+            <div className="flex items-center justify-end gap-3 pt-3 border-t border-gray-100">
+              <button
+                type="button"
+                onClick={() => setAddInhouseModalOpen(false)}
+                className="px-4 py-2 border border-gray-200 text-gray-600 rounded-xl text-xs font-bold hover:bg-gray-50 transition cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={isSavingInhouse}
+                className="px-6 py-2 bg-[#c4f568] hover:bg-[#b2e553] text-[#152113] border border-[#a8df43] rounded-xl text-xs font-extrabold transition shadow-xs cursor-pointer disabled:opacity-50"
+              >
+                {isSavingInhouse ? 'Publishing...' : 'Publish In-House Project'}
+              </button>
+            </div>
+          </form>
         </DialogContent>
       </Dialog>
     </div>

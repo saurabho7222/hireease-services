@@ -22,9 +22,10 @@ export type Job = {
 };
 
 export const trackedPlatforms = [
-  'Labelbox',
   'micro1.',
-  'MERCOR',
+  'Mercor',
+  'sme.careers',
+  'Labelbox',
   'xAI',
   'Alignerr',
   'Anthropic',
@@ -37,6 +38,48 @@ export const trackedPlatforms = [
   'Mindrift',
   'Harvey AI'
 ];
+
+export function getCompanyLogo(company?: string): string {
+  const c = (company || '').toLowerCase().trim();
+  if (c.includes('micro1')) return '/logos/micro1.svg';
+  if (c.includes('mercor')) return '/logos/mercor.svg';
+  if (c.includes('sme')) return '/logos/sme.svg';
+  if (c.includes('turing')) return '/logos/turing.svg';
+  if (c.includes('labelbox')) return '/logos/labelbox.svg';
+  if (c.includes('scale')) return '/logos/scaleai.svg';
+  if (c.includes('elevenlabs')) return '/logos/ElevenLabs.svg';
+  if (c.includes('alignerr')) return '/logos/alignerr.png';
+  if (c.includes('anthropic')) return '/logos/anthropic.svg';
+  if (c.includes('xai')) return '/logos/xai-mark.svg';
+  if (c.includes('outlier')) return '/logos/outlier.svg';
+  if (c.includes('invisible')) return '/logos/invisible.svg';
+  if (c.includes('dataannotation')) return '/logos/dataannotation.svg';
+  if (c.includes('mindrift')) return '/logos/mindrift.svg';
+  if (c.includes('harvey')) return '/logos/harvey.svg';
+  if (c.includes('rws')) return '/logos/rws.svg';
+  return '/logos/micro1.svg';
+}
+
+export function getCompanyDisplayName(company?: string): string {
+  const c = (company || '').toLowerCase().trim();
+  if (c.includes('micro1')) return 'micro1';
+  if (c.includes('mercor')) return 'Mercor';
+  if (c.includes('sme')) return 'SME Careers';
+  if (c.includes('turing')) return 'Turing';
+  if (c.includes('labelbox')) return 'Labelbox';
+  if (c.includes('scale')) return 'Scale AI';
+  if (c.includes('elevenlabs')) return 'ElevenLabs';
+  if (c.includes('alignerr')) return 'Alignerr';
+  if (c.includes('anthropic')) return 'Anthropic';
+  if (c.includes('xai')) return 'xAI';
+  if (c.includes('outlier')) return 'Outlier';
+  if (c.includes('invisible')) return 'Invisible Tech';
+  if (c.includes('dataannotation')) return 'DataAnnotation';
+  if (c.includes('mindrift')) return 'Mindrift';
+  if (c.includes('harvey')) return 'Harvey AI';
+  if (c.includes('rws')) return 'RWS';
+  return company || 'Partner Platform';
+}
 
 export const partners = trackedPlatforms;
 
@@ -126,44 +169,24 @@ export const expertiseProfiles = [
 // Clean role feed: empty by default so only roles created by recruiter in admin panel appear
 export const sampleJobs: Job[] = [];
 
-export const internalProjects = [
-  {
-    id: 'proj-medical-multimodal',
-    title: 'Multimodal Clinical Image & Report Validation',
-    client: 'HireEase In-House Client #42',
-    domain: 'Healthcare',
-    payout: '$85/hr',
-    estimatedHours: '20-30 hrs/week',
-    duration: '8 weeks',
-    status: 'Open for applications',
-    requiredSkills: ['Clinical Review', 'Medical Safety', 'Diagnostics'],
-    description: 'Review radiology and dermatology AI image-description pairs for clinical accuracy, anatomical grounding, and diagnostic risk.'
-  },
-  {
-    id: 'proj-python-security-audit',
-    title: 'Python Cybersecurity & CWE Hallucination Audit',
-    client: 'HireEase In-House Client #19',
-    domain: 'Coding',
-    payout: '$75/hr',
-    estimatedHours: '15-25 hrs/week',
-    duration: '6 weeks',
-    status: 'Open for applications',
-    requiredSkills: ['Python', 'Code Debugging', 'Security'],
-    description: 'Identify insecure code suggestions, SQL injection vulnerabilities, and phantom dependency imports in generated code.'
-  },
-  {
-    id: 'proj-financial-statement-benchmarks',
-    title: 'Corporate Financial Statement Linkage Benchmark',
-    client: 'HireEase In-House Client #88',
-    domain: 'Finance',
-    payout: '$65/hr',
-    estimatedHours: '20 hrs/week',
-    duration: '4 weeks',
-    status: 'Open for applications',
-    requiredSkills: ['Financial Modeling', 'Accounting Standards'],
-    description: 'Evaluate AI spreadsheet engines on 100+ complex real-world SEC filings and GAAP reconciliation tasks.'
-  }
-];
+export type InHouseProject = {
+  id: string;
+  title: string;
+  client: string;
+  domain: string;
+  payout: string;
+  estimatedHours: string;
+  duration: string;
+  status: string;
+  requiredSkills: string[];
+  description: string;
+  createdAt?: string;
+  updatedAt?: string;
+  createdBy?: string;
+};
+
+// Clean in-house projects: loaded dynamically from database (admin managed)
+export const internalProjects: InHouseProject[] = [];
 
 export const practiceLabQuestions = [
   {

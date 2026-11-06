@@ -5,21 +5,27 @@ import { z } from 'zod';
 const updateApplicationSchema = z.object({
   id: z.string().min(1).max(100),
   status: z.enum([
-    'pending',
+    'clicked_apply',
+    'redirected',
+    'awaiting_confirmation',
     'submitted',
     'review',
     'under_review',
+    'assessment',
     'interview_scheduled',
     'interview',
     'interview_done',
+    'interview_completed',
     'approved',
     'selected',
     'hired',
     'rejected',
+    'pending',
     'not_selected'
   ]),
   notes: z.string().max(4000).optional(),
   rating: z.number().min(0).max(5).optional(),
+  interviewDate: z.string().optional(),
   sendEmail: z.boolean().optional()
 });
 
@@ -64,6 +70,23 @@ export async function PATCH(r: Request) {
     if (data.rating !== undefined) {
       snap.adminRating = data.rating;
     }
+    if (data.interviewDate !== undefined) {
+      snap.interviewDate = data.interviewDate;
+    }
+
+    // Log status transition into statusHistory
+    if (!Array.isArray(snap.statusHistory)) {
+      snap.statusHistory = [];
+    }
+    snap.statusHistory.push({
+      status: data.status,
+      timestamp: now,
+      title: data.status,
+      note: data.notes || `Application updated by ${u.email}`,
+      actor: 'admin',
+      actorEmail: u.email,
+      interviewDate: data.interviewDate || snap.interviewDate || null
+    });
 
     const updatedSnapshot = JSON.stringify(snap);
 

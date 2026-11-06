@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState, useMemo, useRef } from 'react';
 import {
   Sparkles,
   Search,
@@ -30,7 +30,8 @@ import {
   Laptop,
   Globe,
   Pause,
-  Play
+  Play,
+  ExternalLink
 } from 'lucide-react';
 import { Sheet, SheetContent, SheetTitle, SheetDescription } from '@/components/ui/sheet';
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from '@/components/ui/dialog';
@@ -40,7 +41,10 @@ import {
   categories,
   expertiseProfiles,
   internalProjects,
-  type Job
+  getCompanyLogo,
+  getCompanyDisplayName,
+  type Job,
+  type InHouseProject
 } from '@/lib/jobs';
 
 export function LinkedinIcon({ size = 16, className = '' }: { size?: number; className?: string }) {
@@ -57,6 +61,19 @@ export function WhatsAppIcon({ size = 16, className = '' }: { size?: number; cla
       <path d="M12.04 2c-5.46 0-9.91 4.45-9.91 9.91 0 1.75.46 3.45 1.32 4.95L2.05 22l5.25-1.38c1.45.79 3.08 1.21 4.74 1.21 5.46 0 9.91-4.45 9.91-9.91 0-2.65-1.03-5.14-2.9-7.01A9.816 9.816 0 0 0 12.04 2m.01 1.67c2.2 0 4.26.86 5.82 2.42a8.225 8.225 0 0 1 2.41 5.83c0 4.54-3.7 8.24-8.24 8.24-1.48 0-2.93-.4-4.2-1.15l-.3-.18-3.12.82.83-3.04-.2-.31a8.196 8.196 0 0 1-1.26-4.38c0-4.54 3.7-8.24 8.24-8.24m4.52 11.66c-.19-.09-1.11-.55-1.28-.61-.17-.07-.3-.09-.43.1-.12.19-.48.61-.59.73-.11.12-.22.14-.4.05-.19-.09-.79-.29-1.5-.93-.55-.49-.93-1.1-1.04-1.28-.11-.19-.01-.29.08-.38.08-.08.19-.22.28-.33.09-.11.12-.19.19-.31.06-.12.03-.24-.02-.33-.04-.09-.43-1.03-.59-1.41-.15-.37-.31-.32-.43-.33h-.37c-.12 0-.33.05-.5.24-.18.19-.68.66-.68 1.62 0 .96.7 1.88.8 2.01.09.12 1.37 2.09 3.32 2.93.46.2.83.32 1.11.41.47.15.89.13 1.23.08.37-.06 1.11-.45 1.27-.89.15-.43.15-.81.11-.89-.04-.08-.17-.13-.36-.22z"/>
     </svg>
   );
+}
+
+export function getDomainIcon(iconName: string, size = 18, className = '') {
+  switch (iconName) {
+    case 'TrendingUp': return <TrendingUp size={size} className={className} />;
+    case 'Languages': return <Languages size={size} className={className} />;
+    case 'Code2': return <Code2 size={size} className={className} />;
+    case 'Atom': return <Atom size={size} className={className} />;
+    case 'Sparkles': return <Sparkles size={size} className={className} />;
+    case 'Stethoscope': return <Stethoscope size={size} className={className} />;
+    case 'Scale': return <Scale size={size} className={className} />;
+    default: return <Sparkles size={size} className={className} />;
+  }
 }
 
 export function Brand({ light = false }: { light?: boolean }) {
@@ -82,6 +99,7 @@ export default function Home() {
   const [savedJobs, setSavedJobs] = useState<string[]>([]);
   // Clean initial jobs feed: start empty so only roles created in admin panel appear
   const [jobs, setJobs] = useState<Job[]>([]);
+  const [inhouseProjects, setInhouseProjects] = useState<InHouseProject[]>([]);
   const [detail, setDetail] = useState<Job | null>(null);
   const [unavailable, setUnavailable] = useState(false);
 
@@ -132,6 +150,15 @@ export default function Home() {
         }
       })
       .catch(() => setUnavailable(true));
+
+    fetch('/api/inhouse-projects')
+      .then(r => r.json())
+      .then((d: any) => {
+        if (d && Array.isArray(d.projects)) {
+          setInhouseProjects(d.projects);
+        }
+      })
+      .catch(() => {});
   }, []);
 
   const visible = useMemo(() => {
@@ -152,6 +179,132 @@ export default function Home() {
       return matchCategory && matchPlatform && matchQuery && matchDemand && matchUrgent;
     });
   }, [jobs, query, category, platform, filterDemand, filterUrgent]);
+
+  // Featured 8 roles for homepage to prevent overly lengthy pages
+  const featuredPreview = useMemo(() => {
+    return visible.slice(0, 8);
+  }, [visible]);
+
+  // Candidate Application Tracking & Redirection State
+  const [trackingModalOpen, setTrackingModalOpen] = useState(false);
+  const [selectedJobForApply, setSelectedJobForApply] = useState<Job | null>(null);
+  const [countdown, setCountdown] = useState(3);
+  const [isSubmittingTracking, setIsSubmittingTracking] = useState(false);
+  const [targetRedirectUrl, setTargetRedirectUrl] = useState('');
+  const [currentUser, setCurrentUser] = useState<{ id: string; email: string; name: string } | null>(null);
+  const [guestEmail, setGuestEmail] = useState('');
+  const [guestName, setGuestName] = useState('');
+  const [showGuestForm, setShowGuestForm] = useState(false);
+  const countdownTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+  useEffect(() => {
+    fetch('/api/auth/me')
+      .then(r => (r.ok ? r.json() : null))
+      .then((d: any) => {
+        if (d?.user) setCurrentUser(d.user);
+      })
+      .catch(() => {});
+  }, []);
+
+  const startCountdown = (url: string) => {
+    if (countdownTimerRef.current) clearInterval(countdownTimerRef.current);
+    let secondsLeft = 3;
+    countdownTimerRef.current = setInterval(() => {
+      secondsLeft -= 1;
+      setCountdown(secondsLeft);
+      if (secondsLeft <= 0) {
+        if (countdownTimerRef.current) clearInterval(countdownTimerRef.current);
+        window.open(url, '_blank', 'noopener,noreferrer');
+        setTrackingModalOpen(false);
+      }
+    }, 1000);
+  };
+
+  const getCleanExcerpt = (desc: string): string => {
+    if (!desc) return '';
+    let text = desc
+      .replace(/[*#_`]/g, '')
+      .replace(/^Role Title:[\s\S]*?(?=Role Type:|$)/i, '')
+      .replace(/^Role Type:[\s\S]*?(?=Location:|$)/i, '')
+      .replace(/^Location:[\s\S]*?(?=(micro1|We are|In this role|About the opportunity|About micro1|Scope of Work|$))/i, '')
+      .replace(/^(About micro1:?|micro1 is engaging:?|We are engaging:?|In this role,?\s*|Scope of Work:?|Role Summary:?)/i, '')
+      .replace(/\s+/g, ' ')
+      .trim();
+    if (!text) text = desc.replace(/[*#_`]/g, '').replace(/\s+/g, ' ').trim();
+    if (text.length > 110) {
+      return text.slice(0, 110).trim() + '…';
+    }
+    return text;
+  };
+
+  const initiateApplication = async (job: Job, e?: React.MouseEvent) => {
+    if (e) {
+      e.stopPropagation();
+      e.preventDefault();
+    }
+    setSelectedJobForApply(job);
+    const referralUrl = job.externalUrl || `https://refer.micro1.ai/referral/jobs?referralCode=a462a1ef-5825-41db-8422-83628df889fc`;
+    setTargetRedirectUrl(referralUrl);
+    setCountdown(3);
+
+    if (currentUser) {
+      setIsSubmittingTracking(true);
+      setTrackingModalOpen(true);
+      try {
+        const res = await fetch('/api/applications/track', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ jobId: job.id, externalUrl: referralUrl })
+        });
+        const data: any = await res.json();
+        if (data.externalUrl) {
+          setTargetRedirectUrl(data.externalUrl);
+        }
+      } catch (err) {
+        console.error('Tracking error:', err);
+      } finally {
+        setIsSubmittingTracking(false);
+        startCountdown(referralUrl);
+      }
+    } else {
+      setTrackingModalOpen(true);
+    }
+  };
+
+  const handleGuestSubmitAndRedirect = async () => {
+    if (!guestEmail.trim()) {
+      toast.error('Please enter your email to track your application.');
+      return;
+    }
+    setIsSubmittingTracking(true);
+    try {
+      const res = await fetch('/api/applications/track', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          jobId: selectedJobForApply?.id,
+          externalUrl: targetRedirectUrl,
+          guestEmail: guestEmail.trim(),
+          guestName: guestName.trim()
+        })
+      });
+      const data: any = await res.json();
+      const finalUrl = data.externalUrl || targetRedirectUrl;
+      setTargetRedirectUrl(finalUrl);
+      toast.success('Application recorded on HireEase Services!');
+      startCountdown(finalUrl);
+    } catch {
+      startCountdown(targetRedirectUrl);
+    } finally {
+      setIsSubmittingTracking(false);
+    }
+  };
+
+  const handleDirectRedirectNow = () => {
+    if (countdownTimerRef.current) clearInterval(countdownTimerRef.current);
+    window.open(targetRedirectUrl, '_blank', 'noopener,noreferrer');
+    setTrackingModalOpen(false);
+  };
 
   const toggleSaveJob = (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
@@ -678,14 +831,20 @@ export default function Home() {
                 <h2>AI Training Roles in One Feed</h2>
                 <p>Explore remote annotation, RLHF, and subject matter expert openings.</p>
               </div>
-              <div className="flex items-center gap-3">
+              <div className="flex items-center gap-3 flex-wrap">
+                <a
+                  href="/jobs"
+                  className="btn green text-xs font-semibold flex items-center gap-2 shadow-xs"
+                >
+                  <Briefcase size={15} /> View All {jobs.length > 0 ? `${jobs.length} ` : ''}Roles
+                </a>
                 <button
                   onClick={() => setAlertModalOpen(true)}
                   className="btn outline-green text-xs font-semibold flex items-center gap-2"
                 >
                   <Bell size={15} /> Set job alert
                 </button>
-                <a href="/dashboard" className="btn green text-xs font-semibold flex items-center gap-2">
+                <a href="/dashboard" className="btn outline-green text-xs font-semibold flex items-center gap-2">
                   <Sparkles size={15} /> Match your skills
                 </a>
               </div>
@@ -755,24 +914,33 @@ export default function Home() {
             </div>
 
             {/* Meta bar */}
-            <div className="results-meta-bar">
+            <div className="results-meta-bar flex items-center justify-between flex-wrap gap-3">
               <span>
                 <strong>{visible.length}</strong> roles matching your criteria
               </span>
-              {(category !== 'All roles' || platform !== 'all' || query || filterDemand || filterUrgent) && (
-                <button
-                  onClick={() => {
-                    setCategory('All roles');
-                    setPlatform('all');
-                    setQuery('');
-                    setFilterDemand(false);
-                    setFilterUrgent(false);
-                  }}
-                  className="reset-filters-btn"
+              <div className="flex items-center gap-2">
+                <a
+                  href="/jobs"
+                  className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-[#edf7e3] hover:bg-[#c4f568] text-[#182319] hover:text-[#182319] font-bold text-xs rounded-full transition shadow-2xs border border-[#d2ebd5]"
                 >
-                  Reset all filters
-                </button>
-              )}
+                  <span>View Full Catalog ({visible.length} Roles)</span>
+                  <ArrowRight size={13} />
+                </a>
+                {(category !== 'All roles' || platform !== 'all' || query || filterDemand || filterUrgent) && (
+                  <button
+                    onClick={() => {
+                      setCategory('All roles');
+                      setPlatform('all');
+                      setQuery('');
+                      setFilterDemand(false);
+                      setFilterUrgent(false);
+                    }}
+                    className="reset-filters-btn ml-2"
+                  >
+                    Reset all filters
+                  </button>
+                )}
+              </div>
             </div>
 
             {unavailable && (
@@ -781,59 +949,71 @@ export default function Home() {
               </p>
             )}
 
-            {/* Job Grid */}
+            {/* Job Grid - Displaying Curated 6-9 Roles Preview */}
             <div className="jobs-cards-grid">
-              {visible.map(j => {
+              {featuredPreview.map(j => {
                 const isSaved = savedJobs.includes(j.id);
                 return (
                   <article key={j.id} className="stn-job-card">
-                    <div className="card-top-row">
-                      <span className="platform-tag">
-                        <span className="dot" />
-                        {j.platform || j.company}
-                      </span>
-                      <div className="card-badge-group">
-                        {j.urgent && (
-                          <span className="badge-urgent">
-                            <Zap size={11} /> Urgent
-                          </span>
-                        )}
-                        {j.highDemand && (
-                          <span className="badge-demand">
-                            <Flame size={11} /> High demand
-                          </span>
-                        )}
-                        <span className="badge-remote">Remote</span>
-                      </div>
-                    </div>
-
-                    <h3 className="job-title-heading">
-                      <button onClick={() => setDetail(j)} className="text-left hover:text-emerald-800">
-                        {j.title}
-                      </button>
-                    </h3>
-
-                    <div className="job-comp-line">
-                      <span className="comp-amount">{j.payRate || j.compensation}</span>
-                      <span className="location-meta">
-                        <MapPin size={13} /> {j.location}
-                      </span>
-                    </div>
-
-                    <p className="job-snippet">{j.description}</p>
-
-                    {/* Match reason highlight */}
-                    <div className="match-reason-box">
-                      <span className="label">Why you:</span> Matches skills in{' '}
-                      <strong>{j.skills.slice(0, 2).join(' & ')}</strong>
-                    </div>
-
-                    <div className="job-skills-row">
-                      {j.skills.slice(0, 4).map(s => (
-                        <span key={s} className="skill-chip">
-                          {s}
+                    <div>
+                      <div className="card-top-row">
+                        <span className="platform-tag flex items-center gap-1.5 pl-1.5 pr-2.5 py-0.5 bg-white border border-[#dce5d4] rounded-full shadow-2xs text-[#182319]">
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img
+                            src={getCompanyLogo(j.company || j.platform)}
+                            alt={j.company || 'Company'}
+                            className="w-4 h-4 object-contain rounded-full bg-white shrink-0"
+                          />
+                          <span className="font-bold">{getCompanyDisplayName(j.company || j.platform)}</span>
                         </span>
-                      ))}
+                        <div className="card-badge-group">
+                          {j.urgent && (
+                            <span className="badge-urgent">
+                              <Zap size={11} /> Urgent
+                            </span>
+                          )}
+                          {j.highDemand && (
+                            <span className="badge-demand">
+                              <Flame size={11} /> High demand
+                            </span>
+                          )}
+                          <span className="badge-remote">Remote</span>
+                        </div>
+                      </div>
+
+                      <h3 className="job-title-heading">
+                        <button onClick={() => setDetail(j)} className="text-left hover:text-emerald-800 transition line-clamp-2">
+                          {j.title}
+                        </button>
+                      </h3>
+
+                      <div className="job-comp-line">
+                        <span className="comp-amount">{j.payRate || j.compensation}</span>
+                        <span className="location-meta">
+                          <MapPin size={12} /> {j.location || 'Remote'}
+                        </span>
+                      </div>
+
+                      <p className="job-snippet">{getCleanExcerpt(j.description)}</p>
+
+                      {/* Match reason highlight */}
+                      <div className="match-reason-box">
+                        <span className="label">Why you:</span> Matches skills in{' '}
+                        <strong>{j.skills.slice(0, 2).join(' & ')}</strong>
+                      </div>
+
+                      <div className="job-skills-row">
+                        {j.skills.slice(0, 3).map(s => (
+                          <span key={s} className="skill-chip">
+                            {s}
+                          </span>
+                        ))}
+                        {j.skills.length > 3 && (
+                          <span className="skill-chip-more">
+                            +{j.skills.length - 3}
+                          </span>
+                        )}
+                      </div>
                     </div>
 
                     <div className="card-bottom-actions">
@@ -855,18 +1035,47 @@ export default function Home() {
                         >
                           <Bookmark size={15} />
                         </button>
-                        <a
-                          href={`/dashboard?role=${encodeURIComponent(j.id)}`}
+                        <button
+                          onClick={e => initiateApplication(j, e)}
                           className="btn-apply-primary"
                         >
                           Apply now
-                        </a>
+                        </button>
                       </div>
                     </div>
                   </article>
                 );
               })}
             </div>
+
+            {/* View All Jobs Prominent Callout Section */}
+            {visible.length > 0 && (
+              <div className="homepage-view-all-box text-center py-10 px-6 bg-white border border-[#dce5d4] rounded-3xl shadow-xs mt-10">
+                <div className="max-w-xl mx-auto space-y-4">
+                  <span className="platform-directory-eyebrow">
+                    EXPLORE COMPLETE CATALOG ({visible.length} OPENINGS)
+                  </span>
+                  <h3 className="text-2xl sm:text-3xl font-extrabold text-[#182319] tracking-tight">
+                    Looking for More Specialist Openings?
+                  </h3>
+                  <p className="text-xs sm:text-sm text-gray-600 leading-relaxed">
+                    Showing a curated preview of 8 roles. Access our full directory of {visible.length} AI training, annotation, and RLHF opportunities with search, pagination, category filters, and dedicated job pages.
+                  </p>
+                  <div className="pt-3">
+                    <a
+                      href="/jobs"
+                      className="btn-view-all-jobs inline-flex items-center justify-center gap-2.5 px-8 py-4 bg-[#c4f568] hover:bg-[#b5f547] text-[#142015] font-extrabold text-base rounded-2xl shadow-md hover:shadow-xl hover:-translate-y-0.5 transition-all duration-200 border-2 border-[#a8e544] cursor-pointer no-underline group"
+                      style={{ backgroundColor: '#c4f568', color: '#142015' }}
+                    >
+                      <span className="text-[#142015] font-extrabold text-base" style={{ color: '#142015' }}>
+                        View All {visible.length} Jobs
+                      </span>
+                      <ArrowRight size={18} className="text-[#142015] stroke-[2.5] group-hover:translate-x-1 transition-transform" style={{ color: '#142015' }} />
+                    </a>
+                  </div>
+                </div>
+              </div>
+            )}
 
             {jobs.length === 0 ? (
               <div className="clean-feed-box">
@@ -914,7 +1123,7 @@ export default function Home() {
           </div>
         </section>
 
-        {/* Interactive Talent Pool Stack (Image 2) */}
+        {/* Interactive Talent Pool Showcase (Re-designed Discipline Matrix) */}
         <section className="talent-stack-section" id="fields">
           <div className="section-header-compact text-center">
             <span className="platform-directory-eyebrow">
@@ -927,54 +1136,166 @@ export default function Home() {
             </p>
           </div>
 
-          <div className="talent-stack-container">
+          {/* Domain Tabs Navigation */}
+          <div className="domain-tabs-nav">
             {expertiseProfiles.map(p => {
               const isActive = activeDomain === p.id;
-              if (isActive) {
-                return (
+              return (
+                <button
+                  key={p.id}
+                  onClick={() => setActiveDomain(p.id)}
+                  className={`domain-tab-btn ${isActive ? 'active' : ''}`}
+                >
+                  <span className="domain-tab-icon">
+                    {getDomainIcon(p.icon, 16)}
+                  </span>
+                  <span className="domain-tab-name">{p.name}</span>
+                  <span className="domain-tab-pay">{p.pay.split(' ')[0]}+</span>
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Active Domain Spotlight Bento Card */}
+          {(() => {
+            const current = expertiseProfiles.find(p => p.id === activeDomain) || expertiseProfiles[0];
+            return (
+              <div className="domain-spotlight-card">
+                <div className="domain-spotlight-content">
+                  <div className="domain-spotlight-header">
+                    <span className="domain-pill-badge">
+                      {getDomainIcon(current.icon, 14)}
+                      <span>SPECIALIST DISCIPLINE</span>
+                    </span>
+                    <span className="domain-demand-tag">● High Frontier Demand</span>
+                  </div>
+
+                  <h3 className="domain-spotlight-title">{current.name}</h3>
+                  <p className="domain-spotlight-roles">{current.roles}</p>
+                  <p className="domain-spotlight-desc">{current.description}</p>
+
+                  <div className="domain-metrics-row">
+                    <div className="domain-metric-box">
+                      <span className="domain-metric-label">Typical Rate</span>
+                      <strong className="domain-metric-val">{current.pay}</strong>
+                    </div>
+                    <div className="domain-metric-box">
+                      <span className="domain-metric-label">Work Style</span>
+                      <strong className="domain-metric-val">100% Remote / Async</strong>
+                    </div>
+                    <div className="domain-metric-box">
+                      <span className="domain-metric-label">Vetting Speed</span>
+                      <strong className="domain-metric-val">24-48 hr Screening</strong>
+                    </div>
+                  </div>
+
+                  <div className="domain-skills-section">
+                    <span className="domain-skills-label">VERIFIED CORE SKILLS</span>
+                    <div className="domain-skills-chips">
+                      {current.skills.map(s => (
+                        <span key={s} className="domain-skill-chip">{s}</span>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="domain-spotlight-actions">
+                    <button
+                      onClick={() => {
+                        setCategory(current.id === 'annotation' ? 'Data Annotation & RLHF' : current.name);
+                        document.getElementById('opportunities')?.scrollIntoView({ behavior: 'smooth' });
+                      }}
+                      className="btn-explore-domain-primary"
+                    >
+                      <span>Explore {current.name} Roles</span>
+                      <span className="btn-explore-arrow">
+                        <ArrowRight size={14} />
+                      </span>
+                    </button>
+                    <button
+                      onClick={() => {
+                        setTalentPoolDomain(current.name);
+                        setTalentPoolModalOpen(true);
+                      }}
+                      className="btn-domain-join-pool"
+                    >
+                      Join Priority Pool
+                    </button>
+                  </div>
+                </div>
+
+                <div className="domain-spotlight-visual">
                   <div
-                    key={p.id}
-                    className="talent-stack-card active"
-                    style={{ backgroundImage: `url(${p.bgImage})` }}
+                    className="domain-visual-img"
+                    style={{ backgroundImage: `url(${current.bgImage})` }}
                   >
-                    <div className="talent-stack-overlay">
-                      <div className="talent-stack-active-content">
-                        <h3 className="talent-stack-active-title">{p.name}</h3>
-                        <p className="talent-stack-active-sub">{p.roles}</p>
-                        <button
-                          onClick={() => {
-                            setCategory(p.id === 'annotation' ? 'Data Annotation & RLHF' : p.name);
-                            document.getElementById('opportunities')?.scrollIntoView({ behavior: 'smooth' });
-                          }}
-                          className="btn-explore-domain"
-                        >
-                          Explore roles
-                          <span className="btn-explore-domain-arrow">
-                            <ArrowRight size={13} />
-                          </span>
-                        </button>
+                    <div className="domain-visual-overlay">
+                      <div className="domain-visual-top">
+                        <span className="domain-live-tag">Active Dispatch</span>
+                        <span className="domain-score-tag">98.7% Client Acceptance</span>
+                      </div>
+                      <div className="domain-visual-card">
+                        <div className="domain-visual-card-icon">
+                          <CheckCircle2 size={18} className="text-emerald-400" />
+                        </div>
+                        <div>
+                          <strong>Human-in-the-Loop Validation</strong>
+                          <p>Auditing frontier reasoning, factual rigor, and safety benchmarks.</p>
+                        </div>
                       </div>
                     </div>
                   </div>
-                );
-              }
+                </div>
+              </div>
+            );
+          })()}
 
+          {/* All 7 Disciplines Overview Grid */}
+          <div className="domain-overview-header">
+            <h4>Browse all 7 disciplines</h4>
+            <p>Click any field to inspect requirements or filter open contracts</p>
+          </div>
+
+          <div className="domain-all-grid">
+            {expertiseProfiles.map(p => {
+              const isActive = activeDomain === p.id;
               return (
                 <div
                   key={p.id}
-                  className="talent-stack-card inactive"
-                  style={{ backgroundImage: `url(${p.bgImage})` }}
+                  className={`domain-mini-card ${isActive ? 'active' : ''}`}
                   onClick={() => setActiveDomain(p.id)}
                 >
-                  <div className="talent-stack-overlay">
-                    <span className="talent-stack-inactive-title">{p.name}</span>
+                  <div className="domain-mini-top">
+                    <div className="domain-mini-icon">
+                      {getDomainIcon(p.icon, 18)}
+                    </div>
+                    <span className="domain-mini-pay">{p.pay}</span>
+                  </div>
+                  <h4 className="domain-mini-title">{p.name}</h4>
+                  <p className="domain-mini-roles">{p.roles}</p>
+                  <div className="domain-mini-skills">
+                    {p.skills.slice(0, 3).map(s => (
+                      <span key={s}>{s}</span>
+                    ))}
+                    {p.skills.length > 3 && <span>+{p.skills.length - 3}</span>}
+                  </div>
+                  <div className="domain-mini-foot">
+                    <button
+                      onClick={e => {
+                        e.stopPropagation();
+                        setCategory(p.id === 'annotation' ? 'Data Annotation & RLHF' : p.name);
+                        document.getElementById('opportunities')?.scrollIntoView({ behavior: 'smooth' });
+                      }}
+                      className="domain-mini-action"
+                    >
+                      View Roles <ArrowRight size={13} />
+                    </button>
                   </div>
                 </div>
               );
             })}
           </div>
 
-          <div className="text-center">
+          <div className="text-center mt-8">
             <button
               onClick={() => setTalentPoolModalOpen(true)}
               className="btn-join-talent-pool-big"
@@ -991,53 +1312,91 @@ export default function Home() {
         <section className="community-section" id="community">
           <div className="wrap">
             <div className="section-header-compact text-center">
-              <span className="eyebrow uppercase tracking-widest text-emerald-800">
+              <span className="platform-directory-eyebrow">
                 OFFICIAL COMMUNITY
               </span>
-              <h2>Join 15,000+ AI Trainers & Specialists</h2>
-              <p>
+              <h2 className="platform-directory-title">Join 15,000+ AI Trainers & Specialists</h2>
+              <p className="platform-directory-subtext" style={{ margin: '0 auto' }}>
                 Get instant job drop notifications, real-time assessment leaks and guidelines, and direct peer networking.
               </p>
             </div>
 
             <div className="community-grid">
-              <div className="community-card">
-                <div>
-                  <span className="community-badge whatsapp">
-                    <WhatsAppIcon size={14} /> WhatsApp Community
+              <div className="community-card whatsapp-card">
+                <div className="community-card-top">
+                  <div className="community-icon-bubble whatsapp">
+                    <WhatsAppIcon size={24} />
+                  </div>
+                  <span className="community-status-pill whatsapp">
+                    <span className="status-dot"></span> 15,000+ Active Members
                   </span>
-                  <h3>📢 Join Our WhatsApp Community</h3>
+                </div>
+
+                <div className="community-card-body">
+                  <span className="community-tag whatsapp">INSTANT ALERTS & DISCUSSIONS</span>
+                  <h3>Join Our WhatsApp Community</h3>
                   <p>
                     Get instant alerts when high-paying AI annotation and RLHF roles drop, assessment interview prep, prompt tips, and direct contractor discussions.
                   </p>
+
+                  <div className="community-perks-row">
+                    <span>⚡ Live Role Drops</span>
+                    <span>🎯 Assessment Prep</span>
+                    <span>💬 Peer Networking</span>
+                    <span>💰 Pay Benchmarks</span>
+                  </div>
                 </div>
+
                 <a
                   href="https://chat.whatsapp.com/Jkb7Uip2sPYK6OLIrR8pFM"
                   target="_blank"
                   rel="noopener noreferrer"
                   className="btn-community-action whatsapp"
                 >
-                  <WhatsAppIcon size={18} /> Join WhatsApp Community
+                  <WhatsAppIcon size={18} />
+                  <span>Join WhatsApp Community</span>
+                  <span className="community-btn-arrow">
+                    <ArrowRight size={14} />
+                  </span>
                 </a>
               </div>
 
-              <div className="community-card">
-                <div>
-                  <span className="community-badge linkedin">
-                    <LinkedinIcon size={14} /> LinkedIn Company
+              <div className="community-card linkedin-card">
+                <div className="community-card-top">
+                  <div className="community-icon-bubble linkedin">
+                    <LinkedinIcon size={24} />
+                  </div>
+                  <span className="community-status-pill linkedin">
+                    <span className="status-dot linkedin"></span> Official Company Channel
                   </span>
-                  <h3>🔗 Follow Us on LinkedIn</h3>
+                </div>
+
+                <div className="community-card-body">
+                  <span className="community-tag linkedin">ENTERPRISE BENCHMARKS & UPDATES</span>
+                  <h3>Follow Us on LinkedIn</h3>
                   <p>
                     Stay updated on enterprise AI industry benchmarks, client project rollouts, remote work guidelines, and verified company announcements.
                   </p>
+
+                  <div className="community-perks-row">
+                    <span>🏛️ Client Rollouts</span>
+                    <span>📈 AI Industry Data</span>
+                    <span>🛡️ Verified Contracts</span>
+                    <span>🌐 Global Network</span>
+                  </div>
                 </div>
+
                 <a
                   href="https://www.linkedin.com/company/hireease-services/"
                   target="_blank"
                   rel="noopener noreferrer"
                   className="btn-community-action linkedin"
                 >
-                  <LinkedinIcon size={18} /> Follow on LinkedIn
+                  <LinkedinIcon size={18} />
+                  <span>Follow on LinkedIn</span>
+                  <span className="community-btn-arrow">
+                    <ArrowRight size={14} />
+                  </span>
                 </a>
               </div>
             </div>
@@ -1224,37 +1583,57 @@ export default function Home() {
             </p>
           </div>
 
-          <div className="internal-projects-grid">
-            {internalProjects.map(proj => (
-              <div key={proj.id} className="inhouse-project-card">
-                <div className="proj-top-meta">
-                  <span className="proj-client-tag">{proj.client}</span>
-                  <span className="proj-payout-badge">{proj.payout}</span>
-                </div>
-                <h3>{proj.title}</h3>
-                <p className="proj-desc">{proj.description}</p>
-                <div className="proj-details-row">
-                  <span>
-                    <Clock size={13} /> {proj.estimatedHours}
-                  </span>
-                  <span>
-                    <Briefcase size={13} /> {proj.duration}
-                  </span>
-                </div>
-                <div className="proj-skills-tags">
-                  {proj.requiredSkills.map(s => (
-                    <span key={s}>{s}</span>
-                  ))}
-                </div>
-                <a
-                  href={`/dashboard?project=${encodeURIComponent(proj.id)}`}
-                  className="btn green w-full font-bold text-xs mt-3 flex items-center justify-center gap-2"
-                >
-                  Apply to project <ArrowRight size={13} />
-                </a>
+          {inhouseProjects.length === 0 ? (
+            <div className="clean-feed-box p-8 bg-white border border-[#dce5d4] rounded-2xl text-center max-w-2xl mx-auto shadow-xs my-6">
+              <div className="w-12 h-12 rounded-full bg-[#edf7e3] text-[#2e5c17] flex items-center justify-center mx-auto mb-3 border border-[#d2ebd5]">
+                <Sparkles size={22} />
               </div>
-            ))}
-          </div>
+              <h3 className="text-lg font-bold text-[#182319] mb-1">Direct In-House Client Assignments</h3>
+              <p className="text-xs text-gray-600 mb-4 max-w-lg mx-auto leading-relaxed">
+                Direct client delivery contracts are released and managed by verified HireEase recruiters with guaranteed hourly rates. Join our talent pool to receive priority invitations when new client cohorts open.
+              </p>
+              <button
+                onClick={() => setTalentPoolModalOpen(true)}
+                className="inline-flex items-center gap-1.5 px-6 py-2.5 bg-[#c4f568] hover:bg-[#b2e553] text-[#152113] border border-[#a8df43] font-extrabold text-xs rounded-xl transition shadow-xs cursor-pointer"
+              >
+                <span>Join Talent Pool for Priority Dispatch</span>
+                <ArrowRight size={14} />
+              </button>
+            </div>
+          ) : (
+            <div className="internal-projects-grid">
+              {inhouseProjects.map(proj => (
+                <div key={proj.id} className="inhouse-project-card">
+                  <div className="proj-top-meta">
+                    <span className="proj-client-tag">{proj.client}</span>
+                    <span className="proj-payout-badge">{proj.payout}</span>
+                  </div>
+                  <h3>{proj.title}</h3>
+                  <p className="proj-desc">{proj.description}</p>
+                  <div className="proj-details-row">
+                    <span>
+                      <Clock size={13} /> {proj.estimatedHours}
+                    </span>
+                    <span>
+                      <Briefcase size={13} /> {proj.duration}
+                    </span>
+                  </div>
+                  <div className="proj-skills-tags">
+                    {proj.requiredSkills.map(s => (
+                      <span key={s}>{s}</span>
+                    ))}
+                  </div>
+                  <a
+                    href={`/dashboard?project=${encodeURIComponent(proj.id)}`}
+                    className="w-full py-2.5 bg-[#c4f568] hover:bg-[#b2e553] text-[#152113] border border-[#a8df43] font-extrabold text-xs rounded-xl mt-3 flex items-center justify-center gap-2 transition shadow-2xs"
+                  >
+                    <span>Apply to project</span>
+                    <ArrowRight size={13} />
+                  </a>
+                </div>
+              ))}
+            </div>
+          )}
         </section>
 
         {/* How It Works */}
@@ -1495,8 +1874,16 @@ export default function Home() {
             <SheetContent className="role-sheet-modern">
               {detail && (
                 <>
-                  <div className="sheet-top-meta">
-                    <span className="platform-pill">{detail.platform || detail.company}</span>
+                  <div className="sheet-top-meta flex items-center gap-2 mb-3">
+                    <div className="w-8 h-8 rounded-lg bg-white border border-[#dce5d4] p-1 flex items-center justify-center shrink-0 shadow-2xs">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={getCompanyLogo(detail.company || detail.platform)}
+                        alt={detail.company}
+                        className="w-full h-full object-contain"
+                      />
+                    </div>
+                    <span className="platform-pill font-bold">{getCompanyDisplayName(detail.company || detail.platform)}</span>
                     <span className="remote-pill">Remote</span>
                   </div>
 
@@ -1541,12 +1928,19 @@ export default function Home() {
                     <p className="text-sm text-gray-700">{detail.experience}</p>
                   </div>
 
-                  <div className="sheet-action-row">
-                    <a
-                      className="btn green w-full font-bold py-3 text-center"
-                      href={`/dashboard?role=${encodeURIComponent(detail.id)}`}
+                  <div className="sheet-action-row space-y-2">
+                    <button
+                      className="btn green w-full font-bold py-3 text-center flex items-center justify-center gap-2"
+                      onClick={() => initiateApplication(detail)}
                     >
-                      Apply with HireEase Profile
+                      <span>Apply on {detail.company || 'Micro1'} (Referral)</span>
+                      <ExternalLink size={15} />
+                    </button>
+                    <a
+                      href={`/jobs/${detail.id}`}
+                      className="btn outline-green w-full font-bold py-2.5 text-center text-xs block"
+                    >
+                      View Dedicated Job Details Page →
                     </a>
                   </div>
                 </>
@@ -1610,6 +2004,109 @@ export default function Home() {
                     Subscribe to alerts
                   </button>
                 </form>
+              )}
+            </DialogContent>
+          </Dialog>
+
+          {/* Candidate Tracking & Redirection Modal */}
+          <Dialog open={trackingModalOpen} onOpenChange={open => !open && setTrackingModalOpen(false)}>
+            <DialogContent className="max-w-md p-6 bg-white rounded-2xl shadow-xl">
+              {selectedJobForApply && (
+                <div>
+                  <div className="w-12 h-12 rounded-2xl bg-[#edf7e3] text-[#2e5c17] flex items-center justify-center mx-auto mb-4 border border-[#d2ebd5]">
+                    <CheckCircle2 size={26} />
+                  </div>
+
+                  <DialogTitle className="text-xl font-extrabold text-center text-[#182319] mb-1">
+                    Application Recorded!
+                  </DialogTitle>
+                  <DialogDescription className="text-xs text-center text-gray-500 mb-4">
+                    {selectedJobForApply.title} · {selectedJobForApply.company}
+                  </DialogDescription>
+
+                  <div className="p-4 bg-[#f4faee] border border-[#d2ebd5] rounded-xl text-xs text-[#204712] mb-5 leading-relaxed space-y-2">
+                    <div className="font-bold flex items-center gap-1.5 text-sm text-[#182319]">
+                      <ShieldCheck size={16} className="text-[#2e5c17]" />
+                      <span>Tracking Activated</span>
+                    </div>
+                    <p>
+                      <strong>&quot;Your application has been recorded on HireEase Services. You will now be redirected to the official job application page.&quot;</strong>
+                    </p>
+                    <div className="text-[11px] text-gray-600 pt-1 border-t border-[#d2ebd5]/60">
+                      Your candidate record has been saved in the administrative dashboard to track review and interview stages.
+                    </div>
+                  </div>
+
+                  {!currentUser && !showGuestForm && (
+                    <div className="mb-5 space-y-2 text-xs">
+                      <div className="p-3 bg-gray-50 border border-gray-200 rounded-xl">
+                        <p className="text-gray-700 font-semibold mb-2">
+                          Want to view your interview status in the candidate dashboard?
+                        </p>
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={() => setShowGuestForm(true)}
+                            className="flex-1 py-1.5 bg-white border border-gray-300 hover:border-[#2e5c17] text-gray-800 font-bold rounded-lg text-xs transition"
+                          >
+                            Enter Email to Track
+                          </button>
+                          <a
+                            href={`/auth?return_to=${encodeURIComponent(`/jobs/${selectedJobForApply.id}`)}`}
+                            className="flex-1 py-1.5 bg-[#edf7e3] hover:bg-[#c4f568] text-[#182319] border border-[#d2ebd5] font-extrabold rounded-lg text-xs text-center transition"
+                          >
+                            Sign In with Google
+                          </a>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {!currentUser && showGuestForm && (
+                    <div className="space-y-3 mb-5 text-xs">
+                      <div>
+                        <label className="block font-bold text-gray-700 mb-1">Your Full Name</label>
+                        <input
+                          type="text"
+                          placeholder="Jane Doe"
+                          value={guestName}
+                          onChange={e => setGuestName(e.target.value)}
+                          className="w-full border border-gray-300 rounded-lg p-2 text-xs"
+                        />
+                      </div>
+                      <div>
+                        <label className="block font-bold text-gray-700 mb-1">Your Email Address *</label>
+                        <input
+                          type="email"
+                          placeholder="jane@example.com"
+                          value={guestEmail}
+                          onChange={e => setGuestEmail(e.target.value)}
+                          className="w-full border border-gray-300 rounded-lg p-2 text-xs"
+                        />
+                      </div>
+                      <button
+                        onClick={handleGuestSubmitAndRedirect}
+                        disabled={isSubmittingTracking}
+                        className="w-full py-2.5 bg-[#c4f568] hover:bg-[#b2e553] text-[#152113] border border-[#a8df43] font-extrabold rounded-xl transition text-xs shadow-xs cursor-pointer"
+                      >
+                        {isSubmittingTracking ? 'Saving & Redirecting...' : 'Save & Continue to Application'}
+                      </button>
+                    </div>
+                  )}
+
+                  <div className="space-y-3">
+                    <button
+                      onClick={handleDirectRedirectNow}
+                      className="w-full py-3 bg-[#c4f568] hover:bg-[#b2e553] text-[#152113] border border-[#a8df43] font-extrabold rounded-xl text-xs transition shadow-sm flex items-center justify-center gap-2 cursor-pointer"
+                    >
+                      <span>Proceed to Official Application Now</span>
+                      <ExternalLink size={14} />
+                    </button>
+
+                    <div className="text-center text-[11px] text-gray-400">
+                      Automatically redirecting in <strong>{countdown}</strong> seconds...
+                    </div>
+                  </div>
+                </div>
               )}
             </DialogContent>
           </Dialog>
