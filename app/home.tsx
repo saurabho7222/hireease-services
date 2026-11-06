@@ -43,7 +43,8 @@ import {
   internalProjects,
   getCompanyLogo,
   getCompanyDisplayName,
-  type Job
+  type Job,
+  type InHouseProject
 } from '@/lib/jobs';
 
 export function LinkedinIcon({ size = 16, className = '' }: { size?: number; className?: string }) {
@@ -98,6 +99,7 @@ export default function Home() {
   const [savedJobs, setSavedJobs] = useState<string[]>([]);
   // Clean initial jobs feed: start empty so only roles created in admin panel appear
   const [jobs, setJobs] = useState<Job[]>([]);
+  const [inhouseProjects, setInhouseProjects] = useState<InHouseProject[]>([]);
   const [detail, setDetail] = useState<Job | null>(null);
   const [unavailable, setUnavailable] = useState(false);
 
@@ -148,6 +150,15 @@ export default function Home() {
         }
       })
       .catch(() => setUnavailable(true));
+
+    fetch('/api/inhouse-projects')
+      .then(r => r.json())
+      .then((d: any) => {
+        if (d && Array.isArray(d.projects)) {
+          setInhouseProjects(d.projects);
+        }
+      })
+      .catch(() => {});
   }, []);
 
   const visible = useMemo(() => {
@@ -212,15 +223,16 @@ export default function Home() {
   const getCleanExcerpt = (desc: string): string => {
     if (!desc) return '';
     let text = desc
+      .replace(/[*#_`]/g, '')
       .replace(/^Role Title:[\s\S]*?(?=Role Type:|$)/i, '')
       .replace(/^Role Type:[\s\S]*?(?=Location:|$)/i, '')
-      .replace(/^Location:[\s\S]*?(?=(micro1|We are|In this role|About the opportunity|About micro1|$))/i, '')
-      .replace(/^(About micro1:?|micro1 is engaging:?|We are engaging:?|In this role,?\s*)/i, '')
+      .replace(/^Location:[\s\S]*?(?=(micro1|We are|In this role|About the opportunity|About micro1|Scope of Work|$))/i, '')
+      .replace(/^(About micro1:?|micro1 is engaging:?|We are engaging:?|In this role,?\s*|Scope of Work:?|Role Summary:?)/i, '')
       .replace(/\s+/g, ' ')
       .trim();
-    if (!text) text = desc.replace(/\s+/g, ' ').trim();
-    if (text.length > 120) {
-      return text.slice(0, 120).trim() + '…';
+    if (!text) text = desc.replace(/[*#_`]/g, '').replace(/\s+/g, ' ').trim();
+    if (text.length > 110) {
+      return text.slice(0, 110).trim() + '…';
     }
     return text;
   };
@@ -1571,37 +1583,57 @@ export default function Home() {
             </p>
           </div>
 
-          <div className="internal-projects-grid">
-            {internalProjects.map(proj => (
-              <div key={proj.id} className="inhouse-project-card">
-                <div className="proj-top-meta">
-                  <span className="proj-client-tag">{proj.client}</span>
-                  <span className="proj-payout-badge">{proj.payout}</span>
-                </div>
-                <h3>{proj.title}</h3>
-                <p className="proj-desc">{proj.description}</p>
-                <div className="proj-details-row">
-                  <span>
-                    <Clock size={13} /> {proj.estimatedHours}
-                  </span>
-                  <span>
-                    <Briefcase size={13} /> {proj.duration}
-                  </span>
-                </div>
-                <div className="proj-skills-tags">
-                  {proj.requiredSkills.map(s => (
-                    <span key={s}>{s}</span>
-                  ))}
-                </div>
-                <a
-                  href={`/dashboard?project=${encodeURIComponent(proj.id)}`}
-                  className="btn green w-full font-bold text-xs mt-3 flex items-center justify-center gap-2"
-                >
-                  Apply to project <ArrowRight size={13} />
-                </a>
+          {inhouseProjects.length === 0 ? (
+            <div className="clean-feed-box p-8 bg-white border border-[#dce5d4] rounded-2xl text-center max-w-2xl mx-auto shadow-xs my-6">
+              <div className="w-12 h-12 rounded-full bg-[#edf7e3] text-[#2e5c17] flex items-center justify-center mx-auto mb-3 border border-[#d2ebd5]">
+                <Sparkles size={22} />
               </div>
-            ))}
-          </div>
+              <h3 className="text-lg font-bold text-[#182319] mb-1">Direct In-House Client Assignments</h3>
+              <p className="text-xs text-gray-600 mb-4 max-w-lg mx-auto leading-relaxed">
+                Direct client delivery contracts are released and managed by verified HireEase recruiters with guaranteed hourly rates. Join our talent pool to receive priority invitations when new client cohorts open.
+              </p>
+              <button
+                onClick={() => setTalentPoolModalOpen(true)}
+                className="inline-flex items-center gap-1.5 px-6 py-2.5 bg-[#c4f568] hover:bg-[#b2e553] text-[#152113] border border-[#a8df43] font-extrabold text-xs rounded-xl transition shadow-xs cursor-pointer"
+              >
+                <span>Join Talent Pool for Priority Dispatch</span>
+                <ArrowRight size={14} />
+              </button>
+            </div>
+          ) : (
+            <div className="internal-projects-grid">
+              {inhouseProjects.map(proj => (
+                <div key={proj.id} className="inhouse-project-card">
+                  <div className="proj-top-meta">
+                    <span className="proj-client-tag">{proj.client}</span>
+                    <span className="proj-payout-badge">{proj.payout}</span>
+                  </div>
+                  <h3>{proj.title}</h3>
+                  <p className="proj-desc">{proj.description}</p>
+                  <div className="proj-details-row">
+                    <span>
+                      <Clock size={13} /> {proj.estimatedHours}
+                    </span>
+                    <span>
+                      <Briefcase size={13} /> {proj.duration}
+                    </span>
+                  </div>
+                  <div className="proj-skills-tags">
+                    {proj.requiredSkills.map(s => (
+                      <span key={s}>{s}</span>
+                    ))}
+                  </div>
+                  <a
+                    href={`/dashboard?project=${encodeURIComponent(proj.id)}`}
+                    className="w-full py-2.5 bg-[#c4f568] hover:bg-[#b2e553] text-[#152113] border border-[#a8df43] font-extrabold text-xs rounded-xl mt-3 flex items-center justify-center gap-2 transition shadow-2xs"
+                  >
+                    <span>Apply to project</span>
+                    <ArrowRight size={13} />
+                  </a>
+                </div>
+              ))}
+            </div>
+          )}
         </section>
 
         {/* How It Works */}
@@ -2020,7 +2052,7 @@ export default function Home() {
                           </button>
                           <a
                             href={`/auth?return_to=${encodeURIComponent(`/jobs/${selectedJobForApply.id}`)}`}
-                            className="flex-1 py-1.5 bg-[#182319] text-[#c4f568] font-bold rounded-lg text-xs text-center transition"
+                            className="flex-1 py-1.5 bg-[#edf7e3] hover:bg-[#c4f568] text-[#182319] border border-[#d2ebd5] font-extrabold rounded-lg text-xs text-center transition"
                           >
                             Sign In with Google
                           </a>
@@ -2054,7 +2086,7 @@ export default function Home() {
                       <button
                         onClick={handleGuestSubmitAndRedirect}
                         disabled={isSubmittingTracking}
-                        className="w-full py-2 bg-[#182319] hover:bg-[#2b421e] text-[#c4f568] font-bold rounded-xl transition text-xs shadow-xs"
+                        className="w-full py-2.5 bg-[#c4f568] hover:bg-[#b2e553] text-[#152113] border border-[#a8df43] font-extrabold rounded-xl transition text-xs shadow-xs cursor-pointer"
                       >
                         {isSubmittingTracking ? 'Saving & Redirecting...' : 'Save & Continue to Application'}
                       </button>
@@ -2064,7 +2096,7 @@ export default function Home() {
                   <div className="space-y-3">
                     <button
                       onClick={handleDirectRedirectNow}
-                      className="w-full py-3 bg-[#182319] hover:bg-[#2b421e] text-[#c4f568] font-bold rounded-xl text-xs transition shadow-md flex items-center justify-center gap-2"
+                      className="w-full py-3 bg-[#c4f568] hover:bg-[#b2e553] text-[#152113] border border-[#a8df43] font-extrabold rounded-xl text-xs transition shadow-sm flex items-center justify-center gap-2 cursor-pointer"
                     >
                       <span>Proceed to Official Application Now</span>
                       <ExternalLink size={14} />

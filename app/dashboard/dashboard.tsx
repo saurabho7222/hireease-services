@@ -52,7 +52,8 @@ import {
   matchingSkills,
   getCompanyLogo,
   getCompanyDisplayName,
-  type Job
+  type Job,
+  type InHouseProject
 } from '@/lib/jobs';
 import { type Profile, type Application, statusLabels } from '@/lib/profile';
 
@@ -79,6 +80,7 @@ export default function Dashboard({
 
   const [profile, setProfile] = useState<Profile | null>(null);
   const [jobs, setJobs] = useState<Job[]>([]);
+  const [inhouseProjects, setInhouseProjects] = useState<InHouseProject[]>([]);
   const [applications, setApplications] = useState<Application[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState('');
@@ -242,10 +244,11 @@ export default function Dashboard({
   async function load() {
     setLoadError('');
     try {
-      const [p, a, j] = await Promise.all([
+      const [p, a, j, inhouseRes] = await Promise.all([
         api('/api/profile'),
         api('/api/applications'),
-        api('/api/jobs')
+        api('/api/jobs'),
+        api('/api/inhouse-projects').catch(() => ({ projects: [] }))
       ]);
       const candProfile: Profile | null = p.profile;
       setProfile(candProfile);
@@ -253,6 +256,9 @@ export default function Dashboard({
       setApplications(a.applications || []);
       const liveJobs = Array.isArray(j?.jobs) ? j.jobs : [];
       setJobs(liveJobs);
+      if (inhouseRes && Array.isArray(inhouseRes.projects)) {
+        setInhouseProjects(inhouseRes.projects);
+      }
 
       // Synchronize controlled form inputs with candidate's actual profile data
       if (candProfile) {
@@ -1037,50 +1043,62 @@ ${resumeEducation}
                           </span>
                         </div>
 
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                          {internalProjects.map(proj => (
-                            <div
-                              key={proj.id}
-                              className="bg-[#fafcfa] border border-[#dce5d4] hover:border-[#77ab3b] rounded-xl p-4 flex flex-col justify-between transition shadow-xs hover:shadow-sm"
-                            >
-                              <div>
-                                <div className="flex items-center gap-2 mb-2 flex-wrap">
-                                  <span className="text-xs font-bold bg-[#edf7e3] text-[#2e5c17] border border-[#d2ebd5] px-2 py-0.5 rounded-full flex items-center gap-1">
-                                    <Sparkles size={11} /> In-House
-                                  </span>
-                                  <span className="text-xs font-bold bg-rose-50 text-rose-700 border border-rose-200 px-2 py-0.5 rounded-full flex items-center gap-1">
-                                    <span className="w-1.5 h-1.5 rounded-full bg-rose-500" /> URGENT
-                                  </span>
-                                </div>
-                                <h3 className="text-sm font-bold text-gray-900 mb-1">{proj.title}</h3>
-                                <p className="text-xs text-gray-500 line-clamp-2 mb-3">{proj.description}</p>
-                                <div className="flex items-center gap-2 text-xs text-gray-600 mb-3 flex-wrap">
-                                  <span className="font-extrabold text-[#182319]">{proj.payout}</span>
-                                  <span>·</span>
-                                  <span>{proj.estimatedHours}</span>
-                                  <span>·</span>
-                                  <span>{proj.duration}</span>
-                                </div>
-                              </div>
-
-                              <div className="flex items-center gap-2 pt-3 border-t border-gray-100">
-                                <button
-                                  onClick={() => setSelectedProject(proj)}
-                                  className="flex-1 py-2 bg-[#182319] hover:bg-[#2b421e] text-white rounded-lg text-xs font-bold transition text-center"
-                                >
-                                  Apply to Project
-                                </button>
-                                <button
-                                  onClick={() => copyToClipboard(`https://hireeaseservices.com/projects/${proj.id}`, 'Project link copied!')}
-                                  className="p-2 border border-gray-200 hover:bg-gray-100 rounded-lg text-gray-600 transition"
-                                  title="Copy project link"
-                                >
-                                  <Copy size={14} />
-                                </button>
-                              </div>
+                        {inhouseProjects.length === 0 ? (
+                          <div className="p-6 bg-[#fafcfa] rounded-xl border border-dashed border-[#dce5d4] text-center">
+                            <div className="w-10 h-10 rounded-full bg-[#edf7e3] text-[#2e5c17] flex items-center justify-center mx-auto mb-2 border border-[#d2ebd5]">
+                              <Sparkles size={18} />
                             </div>
-                          ))}
-                        </div>
+                            <h4 className="text-sm font-bold text-gray-900 mb-1">No Active In-House Projects Right Now</h4>
+                            <p className="text-xs text-gray-500 max-w-md mx-auto">
+                              Recruiter-managed client projects with guaranteed direct payouts will appear here once published. Ensure your profile is complete to receive automatic invitations.
+                            </p>
+                          </div>
+                        ) : (
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            {inhouseProjects.map(proj => (
+                              <div
+                                key={proj.id}
+                                className="bg-[#fafcfa] border border-[#dce5d4] hover:border-[#77ab3b] rounded-xl p-4 flex flex-col justify-between transition shadow-xs hover:shadow-sm"
+                              >
+                                <div>
+                                  <div className="flex items-center gap-2 mb-2 flex-wrap">
+                                    <span className="text-xs font-bold bg-[#edf7e3] text-[#2e5c17] border border-[#d2ebd5] px-2 py-0.5 rounded-full flex items-center gap-1">
+                                      <Sparkles size={11} /> In-House
+                                    </span>
+                                    <span className="text-xs font-bold bg-rose-50 text-rose-700 border border-rose-200 px-2 py-0.5 rounded-full flex items-center gap-1">
+                                      <span className="w-1.5 h-1.5 rounded-full bg-rose-500" /> URGENT
+                                    </span>
+                                  </div>
+                                  <h3 className="text-sm font-bold text-gray-900 mb-1">{proj.title}</h3>
+                                  <p className="text-xs text-gray-500 line-clamp-2 mb-3">{proj.description}</p>
+                                  <div className="flex items-center gap-2 text-xs text-gray-600 mb-3 flex-wrap">
+                                    <span className="font-extrabold text-[#182319]">{proj.payout}</span>
+                                    <span>·</span>
+                                    <span>{proj.estimatedHours}</span>
+                                    <span>·</span>
+                                    <span>{proj.duration}</span>
+                                  </div>
+                                </div>
+
+                                <div className="flex items-center gap-2 pt-3 border-t border-gray-100">
+                                  <button
+                                    onClick={() => setSelectedProject(proj)}
+                                    className="flex-1 py-2 bg-[#c4f568] hover:bg-[#b2e553] text-[#152113] border border-[#a8df43] rounded-lg text-xs font-extrabold transition text-center cursor-pointer shadow-2xs"
+                                  >
+                                    Apply to Project
+                                  </button>
+                                  <button
+                                    onClick={() => copyToClipboard(`https://hireeaseservices.com/projects/${proj.id}`, 'Project link copied!')}
+                                    className="p-2 border border-gray-200 hover:bg-gray-100 rounded-lg text-gray-600 transition cursor-pointer"
+                                    title="Copy project link"
+                                  >
+                                    <Copy size={14} />
+                                  </button>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
                       </div>
 
                       {/* Section 3: Applications & Activity Pipeline */}
@@ -2622,7 +2640,7 @@ ${resumeEducation}
                 <button
                   onClick={() => applyToProject(selectedProject)}
                   disabled={projectApplying}
-                  className="flex-1 py-2.5 bg-[#182319] hover:bg-[#2b421e] text-[#c4f568] text-xs font-bold rounded-xl transition shadow-sm"
+                  className="flex-1 py-2.5 bg-[#c4f568] hover:bg-[#b2e553] text-[#152113] border border-[#a8df43] text-xs font-extrabold rounded-xl transition shadow-sm cursor-pointer"
                 >
                   {projectApplying ? 'Registering...' : 'Register as Contributor'}
                 </button>

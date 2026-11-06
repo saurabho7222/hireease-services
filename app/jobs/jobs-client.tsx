@@ -170,15 +170,16 @@ export default function JobsClient() {
   const getCleanExcerpt = (desc: string): string => {
     if (!desc) return '';
     let text = desc
+      .replace(/[*#_`]/g, '')
       .replace(/^Role Title:[\s\S]*?(?=Role Type:|$)/i, '')
       .replace(/^Role Type:[\s\S]*?(?=Location:|$)/i, '')
-      .replace(/^Location:[\s\S]*?(?=(micro1|We are|In this role|About the opportunity|About micro1|$))/i, '')
-      .replace(/^(About micro1:?|micro1 is engaging:?|We are engaging:?|In this role,?\s*)/i, '')
+      .replace(/^Location:[\s\S]*?(?=(micro1|We are|In this role|About the opportunity|About micro1|Scope of Work|$))/i, '')
+      .replace(/^(About micro1:?|micro1 is engaging:?|We are engaging:?|In this role,?\s*|Scope of Work:?|Role Summary:?)/i, '')
       .replace(/\s+/g, ' ')
       .trim();
-    if (!text) text = desc.replace(/\s+/g, ' ').trim();
-    if (text.length > 120) {
-      return text.slice(0, 120).trim() + '…';
+    if (!text) text = desc.replace(/[*#_`]/g, '').replace(/\s+/g, ' ').trim();
+    if (text.length > 110) {
+      return text.slice(0, 110).trim() + '…';
     }
     return text;
   };
@@ -298,14 +299,14 @@ export default function JobsClient() {
             {currentUser ? (
               <Link
                 href="/dashboard"
-                className="px-4 py-2 bg-[#182319] hover:bg-[#2b421e] text-[#c4f568] text-xs font-bold rounded-xl transition shadow-sm flex items-center gap-1.5"
+                className="px-4 py-2 bg-[#edf7e3] hover:bg-[#c4f568] text-[#182319] border border-[#d2ebd5] text-xs font-extrabold rounded-xl transition shadow-2xs flex items-center gap-1.5"
               >
-                <UserCheck size={14} /> Dashboard ({currentUser.name?.split(' ')[0]})
+                <UserCheck size={14} className="text-[#2e5c17]" /> Dashboard ({currentUser.name?.split(' ')[0]})
               </Link>
             ) : (
               <Link
                 href="/auth?return_to=/jobs"
-                className="px-4 py-2 bg-[#182319] hover:bg-[#2b421e] text-[#c4f568] text-xs font-bold rounded-xl transition shadow-sm"
+                className="px-4 py-2 bg-[#edf7e3] hover:bg-[#c4f568] text-[#182319] border border-[#d2ebd5] text-xs font-extrabold rounded-xl transition shadow-2xs flex items-center gap-1.5"
               >
                 Candidate Sign In
               </Link>
@@ -489,7 +490,7 @@ export default function JobsClient() {
                 setHighDemandOnly(false);
                 setQuery('');
               }}
-              className="px-5 py-2.5 bg-[#182319] text-[#c4f568] text-xs font-bold rounded-xl shadow-xs"
+              className="px-5 py-2.5 bg-[#edf7e3] hover:bg-[#c4f568] text-[#182319] border border-[#d2ebd5] text-xs font-extrabold rounded-xl shadow-2xs cursor-pointer transition"
             >
               Reset all filters
             </button>
@@ -502,7 +503,7 @@ export default function JobsClient() {
                 return (
                   <article
                     key={job.id}
-                    className="bg-white border border-[#dce5d4] hover:border-[#77ab3b] rounded-2xl p-5 shadow-xs hover:shadow-md transition-all flex flex-col justify-between group sm:aspect-square sm:max-h-[390px] min-h-[350px] overflow-hidden"
+                    className="bg-white border border-[#dce5d4] hover:border-[#77ab3b] rounded-2xl p-5 shadow-xs hover:shadow-md transition-all flex flex-col justify-between group min-h-[340px]"
                   >
                     <div>
                       {/* Top Badges & Company Logo */}
@@ -600,13 +601,13 @@ export default function JobsClient() {
                       <div className="flex items-center gap-2">
                         <Link
                           href={`/jobs/${job.id}`}
-                          className="px-3 py-2 border border-gray-200 hover:bg-gray-50 text-gray-700 text-xs font-bold rounded-xl transition"
+                          className="px-3 py-2 border border-gray-200 hover:bg-gray-50 text-gray-700 text-xs font-bold rounded-xl transition text-center"
                         >
                           Details
                         </Link>
                         <button
                           onClick={e => initiateApplication(job, e)}
-                          className="px-4 py-2 bg-[#182319] hover:bg-[#2b421e] text-[#c4f568] text-xs font-bold rounded-xl transition shadow-xs flex items-center gap-1"
+                          className="px-3.5 py-2 bg-[#c4f568] hover:bg-[#b2e553] text-[#152113] border border-[#a8df43] text-xs font-extrabold rounded-xl transition shadow-2xs flex items-center gap-1 cursor-pointer"
                         >
                           <span>Apply Now</span>
                           <ArrowRight size={13} />
@@ -649,7 +650,7 @@ export default function JobsClient() {
                             onClick={() => setCurrentPage(p)}
                             className={`min-w-8 h-8 px-2 text-xs font-bold rounded-lg transition ${
                               currentPage === p
-                                ? 'bg-[#182319] text-[#c4f568]'
+                                ? 'bg-[#c4f568] text-[#152113] border border-[#a8df43] font-extrabold shadow-2xs'
                                 : 'border border-gray-200 hover:bg-gray-50 text-gray-700'
                             }`}
                           >
@@ -722,7 +723,7 @@ export default function JobsClient() {
                       </button>
                       <Link
                         href={`/auth?return_to=${encodeURIComponent(`/jobs/${selectedJobForApply.id}`)}`}
-                        className="flex-1 py-1.5 bg-[#182319] text-[#c4f568] font-bold rounded-lg text-xs text-center transition"
+                        className="flex-1 py-1.5 bg-[#edf7e3] hover:bg-[#c4f568] text-[#182319] border border-[#d2ebd5] font-extrabold rounded-lg text-xs text-center transition"
                       >
                         Sign In with Google
                       </Link>
@@ -757,7 +758,7 @@ export default function JobsClient() {
                   <button
                     onClick={handleGuestSubmitAndRedirect}
                     disabled={isSubmittingTracking}
-                    className="w-full py-2 bg-[#182319] hover:bg-[#2b421e] text-[#c4f568] font-bold rounded-xl transition text-xs shadow-xs"
+                    className="w-full py-2.5 bg-[#c4f568] hover:bg-[#b2e553] text-[#152113] border border-[#a8df43] font-extrabold rounded-xl transition text-xs shadow-xs cursor-pointer"
                   >
                     {isSubmittingTracking ? 'Saving & Redirecting...' : 'Save & Continue to Application'}
                   </button>
@@ -768,7 +769,7 @@ export default function JobsClient() {
               <div className="space-y-3">
                 <button
                   onClick={handleDirectRedirectNow}
-                  className="w-full py-3 bg-[#182319] hover:bg-[#2b421e] text-[#c4f568] font-bold rounded-xl text-xs transition shadow-md flex items-center justify-center gap-2"
+                  className="w-full py-3 bg-[#c4f568] hover:bg-[#b2e553] text-[#152113] border border-[#a8df43] font-extrabold rounded-xl text-xs transition shadow-sm flex items-center justify-center gap-2 cursor-pointer"
                 >
                   <span>Proceed to Official Application Now</span>
                   <ExternalLink size={14} />

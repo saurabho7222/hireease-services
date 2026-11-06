@@ -167,44 +167,24 @@ export const expertiseProfiles = [
 // Clean role feed: empty by default so only roles created by recruiter in admin panel appear
 export const sampleJobs: Job[] = [];
 
-export const internalProjects = [
-  {
-    id: 'proj-medical-multimodal',
-    title: 'Multimodal Clinical Image & Report Validation',
-    client: 'HireEase In-House Client #42',
-    domain: 'Healthcare',
-    payout: '$85/hr',
-    estimatedHours: '20-30 hrs/week',
-    duration: '8 weeks',
-    status: 'Open for applications',
-    requiredSkills: ['Clinical Review', 'Medical Safety', 'Diagnostics'],
-    description: 'Review radiology and dermatology AI image-description pairs for clinical accuracy, anatomical grounding, and diagnostic risk.'
-  },
-  {
-    id: 'proj-python-security-audit',
-    title: 'Python Cybersecurity & CWE Hallucination Audit',
-    client: 'HireEase In-House Client #19',
-    domain: 'Coding',
-    payout: '$75/hr',
-    estimatedHours: '15-25 hrs/week',
-    duration: '6 weeks',
-    status: 'Open for applications',
-    requiredSkills: ['Python', 'Code Debugging', 'Security'],
-    description: 'Identify insecure code suggestions, SQL injection vulnerabilities, and phantom dependency imports in generated code.'
-  },
-  {
-    id: 'proj-financial-statement-benchmarks',
-    title: 'Corporate Financial Statement Linkage Benchmark',
-    client: 'HireEase In-House Client #88',
-    domain: 'Finance',
-    payout: '$65/hr',
-    estimatedHours: '20 hrs/week',
-    duration: '4 weeks',
-    status: 'Open for applications',
-    requiredSkills: ['Financial Modeling', 'Accounting Standards'],
-    description: 'Evaluate AI spreadsheet engines on 100+ complex real-world SEC filings and GAAP reconciliation tasks.'
-  }
-];
+export type InHouseProject = {
+  id: string;
+  title: string;
+  client: string;
+  domain: string;
+  payout: string;
+  estimatedHours: string;
+  duration: string;
+  status: string;
+  requiredSkills: string[];
+  description: string;
+  createdAt?: string;
+  updatedAt?: string;
+  createdBy?: string;
+};
+
+// Clean in-house projects: loaded dynamically from database (admin managed)
+export const internalProjects: InHouseProject[] = [];
 
 export const practiceLabQuestions = [
   {

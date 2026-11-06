@@ -169,7 +169,7 @@ export default function JobDetailClient({ initialJob }: { initialJob?: Job | nul
         <Briefcase size={40} className="text-gray-400 mb-3" />
         <h2 className="text-xl font-bold text-gray-800 mb-2">Job Opening Not Found</h2>
         <p className="text-sm text-gray-500 mb-5">This position may have been filled or the URL is incorrect.</p>
-        <Link href="/jobs" className="px-5 py-2.5 bg-[#182319] text-[#c4f568] text-xs font-bold rounded-xl">
+        <Link href="/jobs" className="px-5 py-2.5 bg-[#c4f568] hover:bg-[#b2e553] text-[#152113] border border-[#a8df43] text-xs font-extrabold rounded-xl transition shadow-xs">
           ← Back to All Jobs
         </Link>
       </div>
@@ -278,7 +278,7 @@ export default function JobDetailClient({ initialJob }: { initialJob?: Job | nul
             <div className="flex flex-col sm:flex-row md:flex-col gap-2.5 shrink-0 w-full sm:w-auto md:w-56">
               <button
                 onClick={initiateApplication}
-                className="w-full py-3.5 bg-[#182319] hover:bg-[#2b421e] text-[#c4f568] font-extrabold text-sm rounded-xl transition shadow-md flex items-center justify-center gap-2"
+                className="w-full py-3.5 bg-[#c4f568] hover:bg-[#b2e553] text-[#152113] font-extrabold text-sm rounded-xl transition shadow-sm border border-[#a8df43] flex items-center justify-center gap-2 cursor-pointer"
               >
                 <span>Apply Now</span>
                 <ExternalLink size={16} />
@@ -430,7 +430,7 @@ export default function JobDetailClient({ initialJob }: { initialJob?: Job | nul
               <div className="pt-4 border-t border-gray-100 space-y-2">
                 <button
                   onClick={initiateApplication}
-                  className="w-full py-3 bg-[#182319] hover:bg-[#2b421e] text-[#c4f568] font-bold rounded-xl text-xs transition shadow-sm flex items-center justify-center gap-1.5"
+                  className="w-full py-3 bg-[#c4f568] hover:bg-[#b2e553] text-[#152113] font-extrabold rounded-xl text-xs transition shadow-sm border border-[#a8df43] flex items-center justify-center gap-1.5 cursor-pointer"
                 >
                   <span>Apply Now</span>
                   <ArrowRight size={14} />
@@ -515,7 +515,7 @@ export default function JobDetailClient({ initialJob }: { initialJob?: Job | nul
                     </button>
                     <Link
                       href={`/auth?return_to=${encodeURIComponent(`/jobs/${job.id}`)}`}
-                      className="flex-1 py-1.5 bg-[#182319] text-[#c4f568] font-bold rounded-lg text-xs text-center transition"
+                      className="flex-1 py-1.5 bg-[#edf7e3] hover:bg-[#c4f568] text-[#182319] border border-[#d2ebd5] font-extrabold rounded-lg text-xs text-center transition"
                     >
                       Sign In with Google
                     </Link>
@@ -550,7 +550,7 @@ export default function JobDetailClient({ initialJob }: { initialJob?: Job | nul
                 <button
                   onClick={handleGuestSubmitAndRedirect}
                   disabled={isSubmittingTracking}
-                  className="w-full py-2 bg-[#182319] hover:bg-[#2b421e] text-[#c4f568] font-bold rounded-xl transition text-xs shadow-xs"
+                  className="w-full py-2.5 bg-[#c4f568] hover:bg-[#b2e553] text-[#152113] border border-[#a8df43] font-extrabold rounded-xl transition text-xs shadow-xs cursor-pointer"
                 >
                   {isSubmittingTracking ? 'Saving & Redirecting...' : 'Save & Continue to Application'}
                 </button>
@@ -561,7 +561,7 @@ export default function JobDetailClient({ initialJob }: { initialJob?: Job | nul
             <div className="space-y-3">
               <button
                 onClick={handleDirectRedirectNow}
-                className="w-full py-3 bg-[#182319] hover:bg-[#2b421e] text-[#c4f568] font-bold rounded-xl text-xs transition shadow-md flex items-center justify-center gap-2"
+                className="w-full py-3 bg-[#c4f568] hover:bg-[#b2e553] text-[#152113] border border-[#a8df43] font-extrabold rounded-xl text-xs transition shadow-sm flex items-center justify-center gap-2 cursor-pointer"
               >
                 <span>Proceed to Official Application Now</span>
                 <ExternalLink size={14} />

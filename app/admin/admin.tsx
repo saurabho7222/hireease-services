@@ -35,14 +35,15 @@ import {
   Briefcase,
   FileDown,
   UserPlus,
-  Globe
+  Globe,
+  Copy
 } from 'lucide-react';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Toaster, toast } from 'sonner';
-import { type Job, categories, trackedPlatforms, getCompanyLogo, getCompanyDisplayName } from '@/lib/jobs';
+import { type Job, type InHouseProject, categories, trackedPlatforms, getCompanyLogo, getCompanyDisplayName } from '@/lib/jobs';
 import {
   type Profile,
   type Application,
@@ -97,6 +98,20 @@ export default function Admin({ email }: { email: string }) {
   const [newAdminPassword, setNewAdminPassword] = useState('');
   const [isAddingAdmin, setIsAddingAdmin] = useState(false);
 
+  // In-House Projects ATS States
+  const [inhouseProjects, setInhouseProjects] = useState<InHouseProject[]>([]);
+  const [addInhouseModalOpen, setAddInhouseModalOpen] = useState(false);
+  const [newInhouseTitle, setNewInhouseTitle] = useState('');
+  const [newInhouseClient, setNewInhouseClient] = useState('');
+  const [newInhouseDomain, setNewInhouseDomain] = useState('Healthcare');
+  const [newInhousePayout, setNewInhousePayout] = useState('$85/hr');
+  const [newInhouseHours, setNewInhouseHours] = useState('20-30 hrs/week');
+  const [newInhouseDuration, setNewInhouseDuration] = useState('8 weeks');
+  const [newInhouseSkills, setNewInhouseSkills] = useState('');
+  const [newInhouseDescription, setNewInhouseDescription] = useState('');
+  const [isSavingInhouse, setIsSavingInhouse] = useState(false);
+  const [deletingInhouseId, setDeletingInhouseId] = useState<string | null>(null);
+
   async function load() {
     try {
       const [adminData, accessRes] = await Promise.all([
@@ -104,6 +119,9 @@ export default function Admin({ email }: { email: string }) {
         api('/api/admin/access').catch(() => null)
       ]);
       setData(adminData);
+      if (adminData?.inhouseProjects) {
+        setInhouseProjects(adminData.inhouseProjects);
+      }
       if (accessRes) setAccessData(accessRes);
       setError('');
     } catch (e) {
@@ -338,6 +356,65 @@ export default function Admin({ email }: { email: string }) {
       toast.success(res.message);
     } catch (e) {
       toast.error((e as Error).message);
+    }
+  }
+
+  async function handleCreateInhouseProject(e: React.FormEvent) {
+    e.preventDefault();
+    if (!newInhouseTitle.trim() || !newInhouseClient.trim() || !newInhouseDescription.trim()) {
+      toast.error('Please fill in title, client name, and project description.');
+      return;
+    }
+    const skillsList = newInhouseSkills
+      .split(',')
+      .map(s => s.trim())
+      .filter(Boolean);
+    if (skillsList.length === 0) {
+      toast.error('Please specify at least one required skill (separated by commas).');
+      return;
+    }
+    setIsSavingInhouse(true);
+    try {
+      await api('/api/inhouse-projects', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title: newInhouseTitle.trim(),
+          client: newInhouseClient.trim(),
+          domain: newInhouseDomain.trim(),
+          payout: newInhousePayout.trim(),
+          estimatedHours: newInhouseHours.trim(),
+          duration: newInhouseDuration.trim(),
+          requiredSkills: skillsList,
+          description: newInhouseDescription.trim()
+        })
+      });
+      toast.success('In-house project published successfully!');
+      setAddInhouseModalOpen(false);
+      setNewInhouseTitle('');
+      setNewInhouseClient('');
+      setNewInhouseSkills('');
+      setNewInhouseDescription('');
+      await load();
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to create in-house project.');
+    } finally {
+      setIsSavingInhouse(false);
+    }
+  }
+
+  async function handleDeleteInhouseProject(id: string) {
+    if (!confirm('Are you sure you want to delete this in-house project?')) return;
+    setDeletingInhouseId(id);
+    try {
+      await api(`/api/inhouse-projects/${id}`, { method: 'DELETE' });
+      setInhouseProjects(prev => prev.filter(p => p.id !== id));
+      toast.success('In-house project deleted successfully.');
+      await load();
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to delete project.');
+    } finally {
+      setDeletingInhouseId(null);
     }
   }
 
@@ -721,6 +798,12 @@ export default function Admin({ email }: { email: string }) {
                   className="data-[state=active]:bg-[#182319] data-[state=active]:text-[#c4f568] text-gray-700 font-bold text-xs px-4 py-2 rounded-xl transition"
                 >
                   Job Openings ({data.jobs.length})
+                </TabsTrigger>
+                <TabsTrigger
+                  value="inhouse"
+                  className="data-[state=active]:bg-[#182319] data-[state=active]:text-[#c4f568] text-gray-700 font-bold text-xs px-4 py-2 rounded-xl transition"
+                >
+                  In-House Projects ({inhouseProjects.length})
                 </TabsTrigger>
                 <TabsTrigger
                   value="approvals"
@@ -1444,6 +1527,133 @@ export default function Admin({ email }: { email: string }) {
                   )}
                 </div>
               </TabsContent>
+
+              {/* TAB 5: IN-HOUSE CLIENT PROJECTS */}
+              <TabsContent value="inhouse" className="space-y-6">
+                <div className="bg-white border border-[#dce5d4] rounded-2xl p-6 shadow-xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <Sparkles size={18} className="text-[#2e5c17]" />
+                      <h2 className="text-base font-extrabold text-[#182319]">
+                        HireEase Managed In-House Projects
+                      </h2>
+                    </div>
+                    <p className="text-xs text-gray-500 mt-1 max-w-xl">
+                      Direct client engagements managed in-house. These appear exclusively on the candidate portal with guaranteed direct payouts and verified hours.
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => setAddInhouseModalOpen(true)}
+                    className="px-4 py-2.5 bg-[#c4f568] hover:bg-[#b2e553] text-[#152113] border border-[#a8df43] rounded-xl text-xs font-extrabold transition flex items-center gap-2 shadow-2xs cursor-pointer shrink-0"
+                  >
+                    <Plus size={15} />
+                    <span>Add In-House Project</span>
+                  </button>
+                </div>
+
+                {inhouseProjects.length === 0 ? (
+                  <div className="bg-white border border-dashed border-[#dce5d4] rounded-2xl p-10 text-center">
+                    <div className="w-12 h-12 rounded-2xl bg-[#edf7e3] text-[#2e5c17] flex items-center justify-center mx-auto mb-3 border border-[#d2ebd5]">
+                      <Briefcase size={22} />
+                    </div>
+                    <h3 className="text-base font-bold text-gray-900 mb-1">No In-House Projects Published</h3>
+                    <p className="text-xs text-gray-500 max-w-md mx-auto mb-4">
+                      Create your first managed client delivery project. Candidates in the talent pool will be able to review requirements and apply directly.
+                    </p>
+                    <button
+                      onClick={() => setAddInhouseModalOpen(true)}
+                      className="px-5 py-2.5 bg-[#c4f568] hover:bg-[#b2e553] text-[#152113] border border-[#a8df43] rounded-xl text-xs font-extrabold transition shadow-xs cursor-pointer inline-flex items-center gap-2"
+                    >
+                      <Plus size={15} /> Add First In-House Project
+                    </button>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+                    {inhouseProjects.map(proj => (
+                      <div
+                        key={proj.id}
+                        className="bg-white border border-[#dce5d4] hover:border-[#77ab3b] rounded-2xl p-5 shadow-xs hover:shadow-md transition flex flex-col justify-between"
+                      >
+                        <div>
+                          <div className="flex items-center justify-between gap-2 mb-2 flex-wrap">
+                            <span className="text-xs font-bold bg-[#edf7e3] text-[#2e5c17] border border-[#d2ebd5] px-2.5 py-0.5 rounded-full flex items-center gap-1">
+                              <Sparkles size={11} /> {proj.domain || 'In-House'}
+                            </span>
+                            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-200 uppercase tracking-wider">
+                              {proj.status || 'open'}
+                            </span>
+                          </div>
+
+                          <h3 className="text-base font-bold text-gray-900 mb-1 line-clamp-2">
+                            {proj.title}
+                          </h3>
+                          <div className="text-xs font-semibold text-gray-500 mb-2">
+                            Client: <span className="text-gray-800">{proj.client}</span>
+                          </div>
+
+                          <p className="text-xs text-gray-600 line-clamp-3 mb-3 leading-relaxed">
+                            {proj.description}
+                          </p>
+
+                          <div className="flex items-center gap-2 text-xs text-gray-700 mb-3 flex-wrap">
+                            <span className="font-extrabold text-[#182319] bg-[#f2f8ee] px-2 py-0.5 rounded border border-[#d2ebd5]">
+                              {proj.payout}
+                            </span>
+                            <span className="text-gray-500 flex items-center gap-1 text-[11px]">
+                              <Clock size={11} /> {proj.estimatedHours}
+                            </span>
+                            <span className="text-gray-500 flex items-center gap-1 text-[11px]">
+                              <Calendar size={11} /> {proj.duration}
+                            </span>
+                          </div>
+
+                          {proj.requiredSkills && proj.requiredSkills.length > 0 && (
+                            <div className="flex items-center gap-1.5 flex-wrap mb-3">
+                              {proj.requiredSkills.slice(0, 3).map(skill => (
+                                <span
+                                  key={skill}
+                                  className="text-[10px] font-medium bg-gray-50 text-gray-600 border border-gray-200 px-2 py-0.5 rounded truncate"
+                                >
+                                  {skill}
+                                </span>
+                              ))}
+                              {proj.requiredSkills.length > 3 && (
+                                <span className="text-[9px] font-bold text-gray-400 bg-gray-100 px-1.5 py-0.5 rounded">
+                                  +{proj.requiredSkills.length - 3}
+                                </span>
+                              )}
+                            </div>
+                          )}
+                        </div>
+
+                        <div className="pt-3 border-t border-gray-100 flex items-center justify-between gap-2 mt-auto">
+                          <button
+                            onClick={() => {
+                              navigator.clipboard.writeText(`https://hireeaseservices.com/dashboard?project=${proj.id}`);
+                              toast.success('Project candidate portal URL copied!');
+                            }}
+                            className="p-2 border border-gray-200 hover:bg-gray-50 text-gray-600 rounded-xl transition cursor-pointer text-xs flex items-center gap-1 font-semibold"
+                            title="Copy link"
+                          >
+                            <Copy size={13} />
+                            <span>Copy link</span>
+                          </button>
+
+                          <button
+                            onClick={() => handleDeleteInhouseProject(proj.id)}
+                            disabled={deletingInhouseId === proj.id}
+                            className="p-2 border border-rose-200 bg-rose-50/50 hover:bg-rose-100 text-rose-700 rounded-xl transition cursor-pointer text-xs flex items-center gap-1 font-semibold disabled:opacity-50"
+                            title="Delete project"
+                          >
+                            <Trash2 size={13} />
+                            <span>{deletingInhouseId === proj.id ? 'Deleting...' : 'Delete'}</span>
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </TabsContent>
             </Tabs>
           </>
         )}
@@ -2031,12 +2241,140 @@ export default function Admin({ email }: { email: string }) {
                 type="button"
                 disabled={isAddingAdmin}
                 onClick={handleCreateAdmin}
-                className="px-5 py-2 bg-[#182319] hover:bg-[#2b421e] text-[#c4f568] text-xs font-bold rounded-xl transition shadow-xs flex items-center gap-1.5"
+                className="px-5 py-2 bg-[#c4f568] hover:bg-[#b2e553] text-[#152113] border border-[#a8df43] text-xs font-extrabold rounded-xl transition shadow-2xs flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
               >
                 {isAddingAdmin ? 'Adding...' : 'Add Administrator'}
               </button>
             </div>
           </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Add In-House Project Modal */}
+      <Dialog open={addInhouseModalOpen} onOpenChange={setAddInhouseModalOpen}>
+        <DialogContent className="max-w-2xl bg-white rounded-3xl p-6 sm:p-8 max-h-[90vh] overflow-y-auto">
+          <DialogTitle className="text-xl font-bold text-[#182319]">
+            Add New In-House Client Project
+          </DialogTitle>
+          <DialogDescription className="text-xs text-gray-500 mb-4">
+            Create an exclusive managed delivery project. It will be published directly to the candidate portal and home feed.
+          </DialogDescription>
+
+          <form onSubmit={handleCreateInhouseProject} className="space-y-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-xs font-bold text-gray-700 mb-1">Project Title *</label>
+                <input
+                  required
+                  placeholder="e.g. Multimodal Clinical Image & Report Validation"
+                  value={newInhouseTitle}
+                  onChange={e => setNewInhouseTitle(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-200 rounded-xl text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-[#2e5c17]"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-gray-700 mb-1">Client Name / Code *</label>
+                <input
+                  required
+                  placeholder="e.g. HireEase In-House Client #42 or Frontier Labs"
+                  value={newInhouseClient}
+                  onChange={e => setNewInhouseClient(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-200 rounded-xl text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-[#2e5c17]"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <div>
+                <label className="block text-xs font-bold text-gray-700 mb-1">Expertise Domain</label>
+                <select
+                  value={newInhouseDomain}
+                  onChange={e => setNewInhouseDomain(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-200 rounded-xl text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-[#2e5c17] bg-white"
+                >
+                  {categories.map(c => (
+                    <option key={c} value={c}>{c}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-gray-700 mb-1">Hourly Payout Rate *</label>
+                <input
+                  required
+                  placeholder="e.g. $85/hr or $60 - $80/hr"
+                  value={newInhousePayout}
+                  onChange={e => setNewInhousePayout(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-200 rounded-xl text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-[#2e5c17]"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-gray-700 mb-1">Estimated Hours</label>
+                <input
+                  required
+                  placeholder="e.g. 20-30 hrs/week"
+                  value={newInhouseHours}
+                  onChange={e => setNewInhouseHours(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-200 rounded-xl text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-[#2e5c17]"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-xs font-bold text-gray-700 mb-1">Project Duration</label>
+                <input
+                  required
+                  placeholder="e.g. 8 weeks or 3 months"
+                  value={newInhouseDuration}
+                  onChange={e => setNewInhouseDuration(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-200 rounded-xl text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-[#2e5c17]"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-gray-700 mb-1">Required Skills (Comma separated) *</label>
+                <input
+                  required
+                  placeholder="e.g. Clinical Review, Diagnostics, Medical Safety"
+                  value={newInhouseSkills}
+                  onChange={e => setNewInhouseSkills(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-200 rounded-xl text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-[#2e5c17]"
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold text-gray-700 mb-1">Project Scope & Description *</label>
+              <textarea
+                required
+                rows={4}
+                placeholder="Describe project responsibilities, evaluation criteria, and contributor expectations..."
+                value={newInhouseDescription}
+                onChange={e => setNewInhouseDescription(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-200 rounded-xl text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-[#2e5c17]"
+              />
+            </div>
+
+            <div className="flex items-center justify-end gap-3 pt-3 border-t border-gray-100">
+              <button
+                type="button"
+                onClick={() => setAddInhouseModalOpen(false)}
+                className="px-4 py-2 border border-gray-200 text-gray-600 rounded-xl text-xs font-bold hover:bg-gray-50 transition cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={isSavingInhouse}
+                className="px-6 py-2 bg-[#c4f568] hover:bg-[#b2e553] text-[#152113] border border-[#a8df43] rounded-xl text-xs font-extrabold transition shadow-xs cursor-pointer disabled:opacity-50"
+              >
+                {isSavingInhouse ? 'Publishing...' : 'Publish In-House Project'}
+              </button>
+            </div>
+          </form>
         </DialogContent>
       </Dialog>
     </div>

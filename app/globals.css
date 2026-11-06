@@ -473,14 +473,12 @@
   justify-content: space-between;
   transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
   position: relative;
-  min-height: 350px;
+  min-height: 340px;
   box-sizing: border-box;
-  overflow: hidden;
 }
 @media (min-width: 640px) {
   .stn-job-card {
-    aspect-ratio: 1 / 1;
-    max-height: 390px;
+    min-height: 345px;
   }
 }
 .stn-job-card:hover {
@@ -689,19 +687,19 @@
   color: #152212;
 }
 .btn-apply-primary {
-  background: #182319;
-  color: #ffffff;
+  background: #c4f568;
+  color: #152113;
   padding: 7px 15px;
   border-radius: 8px;
   font-size: 12px;
-  font-weight: 700;
+  font-weight: 800;
   text-decoration: none;
   transition: all 0.2s ease;
-  border: 1px solid #233425;
+  border: 1px solid #a8df43;
 }
 .btn-apply-primary:hover {
-  background: #283e2a;
-  color: #c4f568;
+  background: #b2e553;
+  color: #0f180d;
 }
 
 /* Prominent High-Visibility View All Jobs Button */

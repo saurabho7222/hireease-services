@@ -126,3 +126,20 @@ CREATE TABLE IF NOT EXISTS outbox_emails (
   sent_at TEXT NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS inhouse_projects (
+  id TEXT PRIMARY KEY NOT NULL,
+  title TEXT NOT NULL,
+  client TEXT NOT NULL,
+  domain TEXT NOT NULL,
+  payout TEXT NOT NULL,
+  estimated_hours TEXT NOT NULL,
+  duration TEXT NOT NULL,
+  status TEXT NOT NULL DEFAULT 'open',
+  required_skills TEXT NOT NULL,
+  description TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  created_by TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_inhouse_status_created ON inhouse_projects (status, created_at);
+

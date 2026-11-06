@@ -1,17 +1,21 @@
 import {db,user,staffUser,body,json,fail,ApiError,setupKey,jobRow,publicProfile} from '@/lib/server';
 import {isSuperAdminEmail} from '@/lib/auth-server';
+import {projectRow} from '@/app/api/inhouse-projects/route';
+
 export async function GET() {
   try {
     await staffUser();
-    const [jobs, applications, profiles] = await Promise.all([
+    const [jobs, applications, profiles, inhouse] = await Promise.all([
       db().prepare('SELECT * FROM jobs ORDER BY created_at DESC LIMIT 5000').all<any>(),
       db().prepare('SELECT * FROM applications ORDER BY created_at DESC LIMIT 5000').all<any>(),
-      db().prepare('SELECT * FROM profiles ORDER BY updated_at DESC LIMIT 5000').all<any>()
+      db().prepare('SELECT * FROM profiles ORDER BY updated_at DESC LIMIT 5000').all<any>(),
+      db().prepare('SELECT * FROM inhouse_projects ORDER BY created_at DESC LIMIT 100').all<any>().catch(() => ({ results: [] }))
     ]);
 
     return json({
       jobs: jobs.results.map(jobRow),
       candidates: profiles.results.map(publicProfile),
+      inhouseProjects: inhouse.results.map(projectRow),
       applications: applications.results.map(a => {
         let snap: any = {};
         try {
