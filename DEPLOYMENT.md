@@ -272,7 +272,16 @@ git pull
 pm2 logs hireease-site --lines 100
 ```
 
-### 2. Port Conflict (Port 3000 already in use)
+### 2. "SyntaxError: The requested module 'node:fs/promises' does not provide an export named 'glob'"
+This error means your server has **Node.js 20** instead of **Node.js 22**. The App Router compiler requires native `node:fs/promises.glob`, introduced in Node.js 22. Upgrade to Node 22 LTS with:
+```bash
+curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash -
+sudo apt install -y nodejs
+node -v # Confirms v22.x
+./deploy-vps.sh
+```
+
+### 3. Port Conflict (Port 3000 already in use)
 Change `PORT=3000` in `.env` and `ecosystem.config.cjs` to another port (e.g. `PORT=3001`), then update `proxy_pass http://127.0.0.1:3001;` in `/etc/nginx/sites-available/hireease.conf` and run `sudo systemctl reload nginx`.
 
 ### 3. File Upload Issues for Large Résumés

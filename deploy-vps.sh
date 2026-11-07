@@ -34,8 +34,32 @@ NODE_VERSION="$(node -v | sed 's/v//')"
 NODE_MAJOR="$(echo "$NODE_VERSION" | cut -d'.' -f1)"
 echo -e "  • Node.js: v${NODE_VERSION} (${GREEN}OK${NC})"
 
-if [ "$NODE_MAJOR" -lt 20 ]; then
-    echo -e "${YELLOW}[WARNING] Node.js v${NODE_VERSION} detected. Version 22.x is recommended.${NC}"
+if [ "$NODE_MAJOR" -lt 22 ]; then
+    echo -e "${YELLOW}[NOTICE] Node.js v${NODE_VERSION} detected. The framework requires Node.js >= 22 (for native fs/promises.glob).${NC}"
+    if command -v apt-get >/dev/null 2>&1; then
+        echo -e "${BLUE}Attempting to upgrade to Node.js 22 LTS via NodeSource...${NC}"
+        SUDO_CMD=""
+        if [ "$EUID" -ne 0 ]; then
+            SUDO_CMD="sudo"
+        fi
+        curl -fsSL https://deb.nodesource.com/setup_22.x | $SUDO_CMD -E bash -
+        $SUDO_CMD apt-get install -y nodejs
+        NODE_VERSION="$(node -v | sed 's/v//')"
+        NODE_MAJOR="$(echo "$NODE_VERSION" | cut -d'.' -f1)"
+        if [ "$NODE_MAJOR" -ge 22 ]; then
+            echo -e "  • Successfully upgraded to Node.js v${NODE_VERSION} (${GREEN}OK${NC})"
+        else
+            echo -e "${RED}[ERROR] Node.js upgrade could not complete automatically. Current version: v${NODE_VERSION}.${NC}"
+            echo -e "Please run the following command manually on your server:"
+            echo -e "  ${BOLD}curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash - && sudo apt install -y nodejs${NC}\n"
+            exit 1
+        fi
+    else
+        echo -e "${RED}[ERROR] Node.js v${NODE_VERSION} detected. Node.js >= 22 is required.${NC}"
+        echo -e "Please upgrade to Node.js 22 LTS:"
+        echo -e "  ${BOLD}curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash - && sudo apt install -y nodejs${NC}\n"
+        exit 1
+    fi
 fi
 
 if ! command -v python3 >/dev/null 2>&1; then
