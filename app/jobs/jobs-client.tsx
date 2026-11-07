@@ -382,7 +382,7 @@ export default function JobsClient() {
                 >
                   <option value="All platforms">All platforms</option>
                   {trackedPlatforms.map(p => (
-                    <option key={p} value={p}>{p}</option>
+                    <option key={p} value={p}>{getCompanyDisplayName(p)}</option>
                   ))}
                 </select>
               </div>

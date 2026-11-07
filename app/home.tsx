@@ -380,111 +380,24 @@ export default function Home() {
 
 
   const getPlatformLogo = (name: string) => {
-    switch (name) {
-      case 'Labelbox':
-        return (
-          <div className="partner-logo-box labelbox">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/logos/labelbox.svg" alt="Labelbox" className="platform-svg-img" style={{ height: '24px', width: 'auto' }} />
-          </div>
-        );
-      case 'micro1.':
-        return (
-          <div className="partner-logo-box micro1">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/logos/micro1.svg" alt="micro1." style={{ height: '22px', width: 'auto', objectFit: 'contain' }} />
-          </div>
-        );
-      case 'MERCOR':
-        return (
-          <div className="partner-logo-box mercor">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/logos/mercor.svg" alt="Mercor" className="platform-svg-img" style={{ height: '24px', width: 'auto', objectFit: 'contain' }} />
-          </div>
-        );
-      case 'xAI':
-        return (
-          <div className="partner-logo-box xai">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/logos/xai.svg" alt="xAI" style={{ height: '22px', width: 'auto', objectFit: 'contain' }} />
-          </div>
-        );
-      case 'Alignerr':
-        return (
-          <div className="partner-logo-box alignerr">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/logos/alignerr.png" alt="Alignerr" className="platform-svg-icon" style={{ height: '24px', width: '24px', objectFit: 'contain' }} />
-            <span className="partner-logo-text alignerr-text" style={{ fontSize: '16px', fontWeight: 700 }}>Alignerr</span>
-          </div>
-        );
-      case 'Anthropic':
-        return (
-          <div className="partner-logo-box anthropic">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/logos/anthropic.svg" alt="Anthropic" style={{ height: '26px', width: 'auto', objectFit: 'contain' }} />
-          </div>
-        );
-      case 'Scale AI':
-        return (
-          <div className="partner-logo-box scale-ai">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/logos/scaleai.svg" alt="Scale AI" style={{ height: '20px', width: 'auto', objectFit: 'contain' }} />
-          </div>
-        );
-      case 'ElevenLabs':
-        return (
-          <div className="partner-logo-box elevenlabs">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/logos/ElevenLabs.svg" alt="ElevenLabs" style={{ height: '20px', width: 'auto', objectFit: 'contain' }} />
-          </div>
-        );
-      case 'Turing':
-        return (
-          <div className="partner-logo-box turing">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/logos/turing.svg" alt="Turing" className="platform-svg-img" style={{ height: '24px', width: 'auto', objectFit: 'contain' }} />
-          </div>
-        );
-      case 'Invisible Tech':
-        return (
-          <div className="partner-logo-box invisible-tech">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/logos/invisible.svg" alt="Invisible Tech" className="platform-svg-icon" style={{ height: '20px', width: 'auto' }} />
-            <span className="partner-logo-text" style={{ fontSize: '15px', fontWeight: 700 }}>Invisible Tech</span>
-          </div>
-        );
-      case 'Outlier':
-        return (
-          <div className="partner-logo-box outlier">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/logos/outlier.svg" alt="Outlier" className="platform-svg-img" style={{ height: '22px', width: 'auto', objectFit: 'contain' }} />
-          </div>
-        );
-      case 'DataAnnotation.tech':
-        return (
-          <div className="partner-logo-box data-annotation">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/logos/dataannotation.svg" alt="DataAnnotation" className="platform-svg-img" style={{ height: '24px', width: 'auto', objectFit: 'contain' }} />
-          </div>
-        );
-      case 'Mindrift':
-        return (
-          <div className="partner-logo-box mindrift">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/logos/mindrift.svg" alt="Mindrift" className="platform-svg-img" style={{ height: '22px', width: 'auto', objectFit: 'contain' }} />
-          </div>
-        );
-      case 'Harvey AI':
-        return (
-          <div className="partner-logo-box harvey-ai">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/logos/harvey.svg" alt="Harvey AI" className="platform-svg-icon" style={{ height: '20px', width: 'auto', objectFit: 'contain' }} />
-            <span className="partner-logo-text harvey-text" style={{ fontSize: '16px', fontWeight: 700 }}>Harvey AI</span>
-          </div>
-        );
-      default:
-        return <span>{name}</span>;
-    }
+    const logoSrc = getCompanyLogo(name);
+    const displayName = getCompanyDisplayName(name);
+    const key = name.toLowerCase().replace(/[^a-z0-9]/g, '');
+
+    return (
+      <div className={`partner-logo-box ${key}`}>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src={logoSrc}
+          alt={displayName}
+          className="platform-svg-icon"
+          style={{ height: '24px', width: '24px', objectFit: 'contain', flexShrink: 0 }}
+        />
+        <span className={`partner-logo-text ${key}-text`} style={{ fontSize: '16px', fontWeight: 700 }}>
+          {displayName}
+        </span>
+      </div>
+    );
   };
 
   const handleTalentPoolSubmit = (e: React.FormEvent) => {
@@ -889,7 +802,7 @@ export default function Home() {
                     <option value="all">All platforms</option>
                     {trackedPlatforms.map(p => (
                       <option key={p} value={p}>
-                        {p}
+                        {getCompanyDisplayName(p)}
                       </option>
                     ))}
                   </select>

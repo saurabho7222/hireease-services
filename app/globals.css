@@ -1559,8 +1559,8 @@
 }
 
 .partner-logo-text.mercor-text {
-  font-size: 15px;
-  letter-spacing: 1.6px;
+  font-size: 16px;
+  letter-spacing: -0.2px;
   font-weight: 800;
 }
 
@@ -1588,13 +1588,15 @@
   font-weight: 800;
 }
 
-.partner-logo-text.invisible-text {
+.partner-logo-text.invisible-text,
+.partner-logo-text.invisibletech-text {
   font-size: 16px;
   letter-spacing: -0.2px;
   font-weight: 700;
 }
 
-.partner-logo-text.dataannotation-text {
+.partner-logo-text.dataannotation-text,
+.partner-logo-text.dataannotationtech-text {
   font-size: 16px;
   letter-spacing: -0.3px;
   font-weight: 700;
@@ -1606,9 +1608,21 @@
   font-weight: 700;
 }
 
-.partner-logo-text.harvey-text {
+.partner-logo-text.harvey-text,
+.partner-logo-text.harveyai-text {
   font-size: 16px;
   letter-spacing: -0.3px;
+  font-weight: 800;
+}
+
+.partner-logo-text.anthropic-text,
+.partner-logo-text.scaleai-text,
+.partner-logo-text.elevenlabs-text,
+.partner-logo-text.labelbox-text,
+.partner-logo-text.smecareers-text,
+.partner-logo-text.rws-text {
+  font-size: 16px;
+  letter-spacing: -0.2px;
   font-weight: 800;
 }
 
