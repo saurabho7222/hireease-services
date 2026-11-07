@@ -31,10 +31,16 @@ yarn-error.log*
 # env files (can opt-in for committing if needed)
 .env*
 !.env.example
+!.env.production.example
 client_secret*.json
 
 # vercel
 .vercel
+
+# backups and logs
+/backups/
+/logs/
+*.sqlite.gz
 
 # typescript
 next-env.d.ts

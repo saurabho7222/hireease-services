@@ -1,0 +1,26 @@
+[Unit]
+Description=HireEase Services Web Application
+After=network.target
+
+[Service]
+Type=simple
+# Change to the non-root user running the app (e.g. ubuntu, debian, www-data)
+User=ubuntu
+WorkingDirectory=/var/www/hireease-site
+Environment=NODE_ENV=production
+Environment=PORT=3000
+Environment=HOST=127.0.0.1
+ExecStart=/usr/bin/npm run start
+Restart=always
+RestartSec=5
+
+# Resource limits
+LimitNOFILE=65535
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=hireease-site
+
+[Install]
+WantedBy=multi-user.target

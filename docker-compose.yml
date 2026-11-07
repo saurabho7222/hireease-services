@@ -1,0 +1,39 @@
+version: '3.8'
+
+services:
+  hireease:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: hireease-site
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+      - HOST=0.0.0.0
+      - SUPER_ADMIN_EMAIL=${SUPER_ADMIN_EMAIL:-admin@hireease.com}
+      - ADMIN_SETUP_KEY=${ADMIN_SETUP_KEY}
+      - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}
+      - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET}
+      - GITHUB_CLIENT_ID=${GITHUB_CLIENT_ID}
+      - GITHUB_CLIENT_SECRET=${GITHUB_CLIENT_SECRET}
+      - LINKEDIN_CLIENT_ID=${LINKEDIN_CLIENT_ID}
+      - LINKEDIN_CLIENT_SECRET=${LINKEDIN_CLIENT_SECRET}
+      - RESEND_API_KEY=${RESEND_API_KEY}
+    volumes:
+      # Persist SQLite / D1 database across container recreations
+      - hireease-d1-data:/app/.wrangler/state
+      # Persist candidate résumé PDFs
+      - hireease-resumes:/app/public/resumes
+      # Persist database backup archives
+      - ./backups:/app/backups
+    env_file:
+      - .env
+
+volumes:
+  hireease-d1-data:
+    name: hireease_d1_data
+  hireease-resumes:
+    name: hireease_resumes
