@@ -228,22 +228,29 @@ Backups are compressed with gzip and stored in `backups/`. Archives older than 1
 
 ---
 
-## 🐳 Option C: Docker Deployment
+## 🐳 Option C: Docker Deployment (1-Click or Manual)
 
-If you prefer deploying with Docker & Docker Compose:
+Docker automatically bundles Node.js 22 LTS, SQLite, Python 3, and all build tools inside an isolated container, completely bypassing any host system Node.js version issues.
 
+### 1-Click Docker Runner:
 ```bash
-# 1. Ensure Docker & Docker Compose are installed
-sudo apt install -y docker.io docker-compose-v2
+./run-docker.sh
+```
+
+### Or Manual Docker Compose:
+```bash
+# 1. Ensure Docker & Compose are installed
+curl -fsSL https://get.docker.com | sh
+sudo apt install -y docker-compose-v2
 
 # 2. Configure .env
 cp .env.production.example .env
 nano .env
 
-# 3. Build and launch containers
+# 3. Build and launch container in background
 docker compose up -d --build
 
-# 4. View logs
+# 4. View live logs
 docker compose logs -f
 ```
 

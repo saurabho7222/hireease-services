@@ -14,14 +14,15 @@ services:
       - PORT=3000
       - HOST=0.0.0.0
       - SUPER_ADMIN_EMAIL=${SUPER_ADMIN_EMAIL:-admin@hireease.com}
-      - ADMIN_SETUP_KEY=${ADMIN_SETUP_KEY}
-      - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}
-      - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET}
-      - GITHUB_CLIENT_ID=${GITHUB_CLIENT_ID}
-      - GITHUB_CLIENT_SECRET=${GITHUB_CLIENT_SECRET}
-      - LINKEDIN_CLIENT_ID=${LINKEDIN_CLIENT_ID}
-      - LINKEDIN_CLIENT_SECRET=${LINKEDIN_CLIENT_SECRET}
-      - RESEND_API_KEY=${RESEND_API_KEY}
+      - ADMIN_SETUP_KEY=${ADMIN_SETUP_KEY:-}
+      - NEXT_PUBLIC_APP_URL=${NEXT_PUBLIC_APP_URL:-http://localhost:3000}
+      - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID:-}
+      - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET:-}
+      - GITHUB_CLIENT_ID=${GITHUB_CLIENT_ID:-}
+      - GITHUB_CLIENT_SECRET=${GITHUB_CLIENT_SECRET:-}
+      - LINKEDIN_CLIENT_ID=${LINKEDIN_CLIENT_ID:-}
+      - LINKEDIN_CLIENT_SECRET=${LINKEDIN_CLIENT_SECRET:-}
+      - RESEND_API_KEY=${RESEND_API_KEY:-}
     volumes:
       # Persist SQLite / D1 database across container recreations
       - hireease-d1-data:/app/.wrangler/state
@@ -29,12 +30,9 @@ services:
       - hireease-resumes:/app/public/resumes
       # Persist database backup archives
       - ./backups:/app/backups
-    env_file:
-      - .env
 
 volumes:
   hireease-d1-data:
     name: hireease_d1_data
   hireease-resumes:
     name: hireease_resumes
-
