@@ -280,3 +280,4 @@ Nginx is pre-configured with `client_max_body_size 50M;` in `nginx/hireease.conf
 
 ### 4. Database Status Check
 Run `npm run db:verify` at any time to verify the database file is active, all 11 tables exist, and all 1,245 jobs are intact.
+

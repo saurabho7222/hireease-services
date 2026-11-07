@@ -66,3 +66,4 @@ echo "[OK] Backup created successfully: $DEST_GZ ($BACKUP_SIZE)"
 find "$BACKUP_DIR" -name "hireease_*.sqlite.gz" -type f -mtime +14 -delete
 echo "[OK] Cleaned up backups older than 14 days."
 echo "=================================================="
+

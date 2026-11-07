@@ -114,3 +114,4 @@ echo -e "  • Restart application:  ${BOLD}pm2 restart hireease-site${NC}"
 echo -e "  • Backup database:      ${BOLD}npm run db:backup${NC}"
 echo -e "  • Database status:      ${BOLD}npm run db:verify${NC}"
 echo -e "  • Nginx config:         ${BOLD}nginx/hireease.conf${NC}\n"
+

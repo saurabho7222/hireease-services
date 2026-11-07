@@ -51,3 +51,4 @@ child.on("exit", (code, signal) => {
 // Forward termination signals gracefully
 process.on("SIGINT", () => child.kill("SIGINT"));
 process.on("SIGTERM", () => child.kill("SIGTERM"));
+

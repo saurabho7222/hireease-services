@@ -37,3 +37,4 @@ volumes:
     name: hireease_d1_data
   hireease-resumes:
     name: hireease_resumes
+
