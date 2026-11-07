@@ -17,3 +17,4 @@ fi
 
 echo "[Docker] Starting HireEase production web server..."
 exec "$@"
+

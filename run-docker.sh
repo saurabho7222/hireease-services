@@ -66,3 +66,4 @@ echo -e "Access URL:      ${BOLD}http://localhost:3000${NC} (or http://YOUR_VPS_
 echo -e "View live logs:  ${BOLD}${COMPOSE_CMD} logs -f hireease${NC}"
 echo -e "Restart app:     ${BOLD}${COMPOSE_CMD} restart hireease${NC}"
 echo -e "Stop app:        ${BOLD}${COMPOSE_CMD} down${NC}\n"
+
